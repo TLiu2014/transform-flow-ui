@@ -1,0 +1,134 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "revenue-and-status",
+    "createdAt": "2026-05-06T00:00:00.000Z",
+    "description": "Branched flow: same join as the linear pipeline, then two parallel branches — (a) shipped-only revenue per country, (b) overall order count per status."
+  },
+  "datasets": {
+    "customers": {
+      "columns": [
+        { "name": "id", "type": "integer" },
+        { "name": "name", "type": "string" },
+        { "name": "country", "type": "string" },
+        { "name": "signup_date", "type": "date" }
+      ]
+    },
+    "orders": {
+      "columns": [
+        { "name": "order_id", "type": "integer" },
+        { "name": "customer_id", "type": "integer" },
+        { "name": "amount", "type": "float" },
+        { "name": "status", "type": "string" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "n1",
+      "name": "load_customers",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "customers",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "customers",
+        "source": "customers.csv"
+      }
+    },
+    {
+      "id": "n2",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "orders",
+        "source": "orders.csv"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "join_customers_orders",
+      "type": "JOIN",
+      "depends_on": ["n1", "n2"],
+      "inputs": ["customers", "orders"],
+      "output": "customers_with_orders",
+      "operation": {
+        "stageType": "JOIN",
+        "joinType": "INNER",
+        "leftTable": "customers",
+        "rightTable": "orders",
+        "leftKey": "id",
+        "rightKey": "customer_id"
+      }
+    },
+    {
+      "id": "n4",
+      "name": "filter_shipped",
+      "type": "FILTER",
+      "depends_on": ["n3"],
+      "inputs": ["customers_with_orders"],
+      "output": "shipped_orders",
+      "operation": {
+        "stageType": "FILTER",
+        "table": "customers_with_orders",
+        "column": "status",
+        "operator": "=",
+        "value": "shipped"
+      }
+    },
+    {
+      "id": "n5",
+      "name": "revenue_by_country",
+      "type": "GROUP",
+      "depends_on": ["n4"],
+      "inputs": ["shipped_orders"],
+      "output": "revenue_by_country",
+      "operation": {
+        "stageType": "GROUP",
+        "table": "shipped_orders",
+        "groupBy": ["country"],
+        "aggregations": [
+          { "fn": "SUM", "column": "amount", "alias": "revenue" }
+        ]
+      }
+    },
+    {
+      "id": "n6",
+      "name": "orders_by_status",
+      "type": "GROUP",
+      "depends_on": ["n3"],
+      "inputs": ["customers_with_orders"],
+      "output": "orders_by_status",
+      "operation": {
+        "stageType": "GROUP",
+        "table": "customers_with_orders",
+        "groupBy": ["status"],
+        "aggregations": [
+          { "fn": "COUNT", "column": "order_id", "alias": "order_count" }
+        ]
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "n1", "position": { "x": 60, "y": 60 } },
+      { "id": "n2", "position": { "x": 320, "y": 60 } },
+      { "id": "n3", "position": { "x": 190, "y": 220 } },
+      { "id": "n4", "position": { "x": 60, "y": 380 } },
+      { "id": "n5", "position": { "x": 60, "y": 540 } },
+      { "id": "n6", "position": { "x": 380, "y": 380 } }
+    ],
+    "edges": [
+      { "id": "e1-3", "source": "n1", "target": "n3" },
+      { "id": "e2-3", "source": "n2", "target": "n3" },
+      { "id": "e3-4", "source": "n3", "target": "n4" },
+      { "id": "e4-5", "source": "n4", "target": "n5" },
+      { "id": "e3-6", "source": "n3", "target": "n6" }
+    ]
+  }
+}

@@ -250,3 +250,199 @@ export function deserializePipeline(schema: PipelineSchema): DeserializedPipelin
     edges: schema.layout.edges.map((e) => ({ ...e })),
   };
 }
+
+/**
+ * Lightweight runtime check that a parsed object looks like a PipelineSchema.
+ * Returns null when valid, or a short error message otherwise. Useful for
+ * validating user-pasted JSON before calling deserializePipeline.
+ */
+export function validatePipelineSchema(value: unknown): string | null {
+  if (!value || typeof value !== "object") return "Expected an object";
+  const v = value as Record<string, unknown>;
+  if (v.version !== "1.0") return `Unsupported version: ${String(v.version)}`;
+  if (!v.pipeline || typeof v.pipeline !== "object")
+    return "Missing or invalid `pipeline`";
+  if (!Array.isArray(v.stages)) return "Missing or invalid `stages` array";
+  if (!v.layout || typeof v.layout !== "object") return "Missing `layout`";
+  const layout = v.layout as Record<string, unknown>;
+  if (!Array.isArray(layout.nodes) || !Array.isArray(layout.edges))
+    return "`layout.nodes` and `layout.edges` must be arrays";
+  return null;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Output schema inference
+ *
+ * The UI module never executes data, so we can only *infer* output columns
+ * from the operation parameters. inferOutputSchemas walks stages in order and
+ * threads each input's columns through the operation to produce a best-effort
+ * output schema. Useful for a "Data Schema" panel without a real engine.
+ * ------------------------------------------------------------------------- */
+
+export interface InferredColumn {
+  name: string;
+  type: ColumnType;
+  /** Origin: "{datasetOrTable}.{column}" when traceable, else stage.output. */
+  source?: string;
+}
+
+export interface StageOutputSchema {
+  stageId: string;
+  output: string;
+  columns: InferredColumn[];
+  /** false for LOAD (taken directly from datasets), true for derived stages. */
+  inferred: boolean;
+  /** Set when inference couldn't determine columns (e.g. CUSTOM, missing input). */
+  unknown?: boolean;
+}
+
+/** Map keyed by stage.id. Iteration order matches schema.stages order. */
+export type InferredSchemaMap = Map<string, StageOutputSchema>;
+
+export function inferOutputSchemas(schema: PipelineSchema): InferredSchemaMap {
+  const result: InferredSchemaMap = new Map();
+  for (const stage of schema.stages) {
+    result.set(stage.id, computeStageOutput(stage, schema, result));
+  }
+  return result;
+}
+
+function computeStageOutput(
+  stage: SerializedStage,
+  schema: PipelineSchema,
+  prior: InferredSchemaMap,
+): StageOutputSchema {
+  const op = stage.operation;
+  switch (op.stageType) {
+    case "LOAD": {
+      const tableName = op.tableName || stage.output;
+      const dataset = schema.datasets[tableName];
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: (dataset?.columns ?? []).map((c) => ({
+          ...c,
+          source: `${tableName}.${c.name}`,
+        })),
+        inferred: false,
+      };
+    }
+    case "FILTER":
+    case "SORT": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: cols,
+        inferred: true,
+      };
+    }
+    case "SELECT": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      const keep = new Set(op.columns);
+      const projected = cols.filter((c) => keep.has(c.name));
+      const missing = op.columns
+        .filter((name) => !cols.some((c) => c.name === name))
+        .map<InferredColumn>((name) => ({ name, type: "unknown" }));
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: [...projected, ...missing],
+        inferred: true,
+      };
+    }
+    case "JOIN": {
+      const left = lookupColumnsByTableName(op.leftTable, schema, prior);
+      const right = lookupColumnsByTableName(op.rightTable, schema, prior);
+      // Drop the right-side join key to mimic typical SQL projections.
+      const rightProjected = right.filter((c) => c.name !== op.rightKey);
+      // Disambiguate name collisions with an underscore suffix.
+      const leftNames = new Set(left.map((c) => c.name));
+      const merged = [
+        ...left,
+        ...rightProjected.map((c) =>
+          leftNames.has(c.name) ? { ...c, name: `${c.name}_right` } : c,
+        ),
+      ];
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: merged,
+        inferred: true,
+      };
+    }
+    case "UNION": {
+      const first = op.tables[0]
+        ? lookupColumnsByTableName(op.tables[0], schema, prior)
+        : [];
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: first,
+        inferred: true,
+      };
+    }
+    case "GROUP": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      const grouped = op.groupBy.map<InferredColumn>(
+        (name) =>
+          cols.find((c) => c.name === name) ?? { name, type: "unknown" },
+      );
+      const aggregated = op.aggregations.map<InferredColumn>((a) => ({
+        name: a.alias || `${a.fn.toLowerCase()}_${a.column}`,
+        type: aggregateOutputType(a.fn),
+      }));
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: [...grouped, ...aggregated],
+        inferred: true,
+      };
+    }
+    case "CUSTOM":
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: [],
+        inferred: true,
+        unknown: true,
+      };
+  }
+}
+
+function lookupColumnsByTableName(
+  tableName: string,
+  schema: PipelineSchema,
+  prior: InferredSchemaMap,
+): InferredColumn[] {
+  if (!tableName) return [];
+  // Prefer a prior stage's output (most recent wins for same name).
+  let fromStage: InferredColumn[] | null = null;
+  for (const inf of prior.values()) {
+    if (inf.output === tableName) fromStage = inf.columns;
+  }
+  if (fromStage) return fromStage;
+
+  const dataset = schema.datasets[tableName];
+  if (dataset) {
+    return dataset.columns.map((c) => ({
+      ...c,
+      source: `${tableName}.${c.name}`,
+    }));
+  }
+  return [];
+}
+
+function aggregateOutputType(fn: string): ColumnType {
+  switch (fn) {
+    case "COUNT":
+      return "integer";
+    case "SUM":
+    case "AVG":
+    case "MIN":
+    case "MAX":
+      return "float";
+    default:
+      return "unknown";
+  }
+}

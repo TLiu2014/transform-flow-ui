@@ -1,9 +1,10 @@
 import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { Filter, GitMerge, Layers, ArrowDownAZ, Columns3, Database, FunctionSquare, Code2 } from "lucide-react";
+import { Filter, GitMerge, Layers, ArrowDownAZ, Columns3, Database, FunctionSquare, Code2, ExternalLink, Pencil } from "lucide-react";
 import type { StageNodeData, StageType } from "@/types/pipeline";
 import { STAGE_COLORS } from "@/types/pipeline";
 import { cn } from "@/lib/utils";
+import { useStageNodeCallbacks } from "./stage-node-context";
 
 const STAGE_ICONS: Record<StageType, typeof Filter> = {
   LOAD: Database,
@@ -25,9 +26,10 @@ const EXEC_BADGE: Record<NonNullable<StageNodeData["executionState"]>, string> =
 
 type StageNodeType = Node<StageNodeData, "stageNode">;
 
-function StageNodeImpl({ data, selected }: NodeProps<StageNodeType>) {
+function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
   const color = STAGE_COLORS[data.stageType];
   const Icon = STAGE_ICONS[data.stageType];
+  const { onShowOutput, onEdit } = useStageNodeCallbacks();
 
   return (
     <div
@@ -58,15 +60,48 @@ function StageNodeImpl({ data, selected }: NodeProps<StageNodeType>) {
             >
               {data.stageType}
             </span>
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
-              #{data.stageIndex}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                #{data.stageIndex}
+              </span>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(id);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="Edit stage (or double-click the node)"
+                  aria-label="Edit stage"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="mt-1 truncate text-sm text-gray-800">{data.label}</div>
           {data.outputTableName && (
-            <div className="mt-1 truncate text-[11px] text-gray-500">
-              → {data.outputTableName}
-            </div>
+            onShowOutput ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowOutput(id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                title={`View ${data.outputTableName} schema`}
+                className="mt-1 inline-flex max-w-full items-center gap-1 truncate rounded text-[11px] text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              >
+                <span className="truncate">→ {data.outputTableName}</span>
+                <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
+              </button>
+            ) : (
+              <div className="mt-1 truncate text-[11px] text-gray-500">
+                → {data.outputTableName}
+              </div>
+            )
           )}
           {data.executionState && (
             <span

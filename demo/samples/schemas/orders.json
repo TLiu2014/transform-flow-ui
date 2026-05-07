@@ -1,0 +1,9 @@
+{
+  "name": "orders",
+  "columns": [
+    { "name": "order_id", "type": "integer" },
+    { "name": "customer_id", "type": "integer" },
+    { "name": "amount", "type": "float" },
+    { "name": "status", "type": "string" }
+  ]
+}

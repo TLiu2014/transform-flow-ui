@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,12 +31,27 @@ interface StageConfigUIProps {
   node: { id: string; data: StageNodeData } | null;
   onUpdate: (id: string, patch: Partial<StageNodeData>) => void;
   onDelete: (id: string) => void;
+  /**
+   * Optional explicit-close handler. When provided, the form renders a
+   * "Cancel" button next to "Save". The host decides what cancel means —
+   * typically clearing the editing-node state (which dismisses the popover
+   * or empties the right panel). Unsaved local edits are dropped on close.
+   */
+  onCancel?: () => void;
+  /** When true (default), delete opens a confirmation dialog first. */
+  confirmBeforeDelete?: boolean;
 }
 
-export function StageConfigUI({ node, onUpdate, onDelete }: StageConfigUIProps) {
+export function StageConfigUI({
+  node,
+  onUpdate,
+  onDelete,
+  onCancel,
+  confirmBeforeDelete = true,
+}: StageConfigUIProps) {
   if (!node) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-500">
+      <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-sm text-gray-500">
         Select a node on the canvas to configure it.
       </div>
     );
@@ -41,6 +63,8 @@ export function StageConfigUI({ node, onUpdate, onDelete }: StageConfigUIProps) 
       node={node}
       onUpdate={onUpdate}
       onDelete={onDelete}
+      onCancel={onCancel}
+      confirmBeforeDelete={confirmBeforeDelete}
     />
   );
 }
@@ -49,14 +73,23 @@ interface StageConfigFormProps {
   node: { id: string; data: StageNodeData };
   onUpdate: (id: string, patch: Partial<StageNodeData>) => void;
   onDelete: (id: string) => void;
+  onCancel?: () => void;
+  confirmBeforeDelete: boolean;
 }
 
-function StageConfigForm({ node, onUpdate, onDelete }: StageConfigFormProps) {
+function StageConfigForm({
+  node,
+  onUpdate,
+  onDelete,
+  onCancel,
+  confirmBeforeDelete,
+}: StageConfigFormProps) {
   const [label, setLabel] = useState(node.data.label);
   const [config, setConfig] = useState<StageConfig>(node.data.config);
   const [outputTableName, setOutputTableName] = useState(
     node.data.outputTableName ?? "",
   );
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     setLabel(node.data.label);
@@ -66,6 +99,22 @@ function StageConfigForm({ node, onUpdate, onDelete }: StageConfigFormProps) {
 
   const color = STAGE_COLORS[node.data.stageType];
 
+  const isDirty = useMemo(() => {
+    if (label !== node.data.label) return true;
+    const cleanOutput = outputTableName || undefined;
+    if (cleanOutput !== node.data.outputTableName) return true;
+    // Config is a small POJO union — JSON-string compare is fine.
+    if (JSON.stringify(config) !== JSON.stringify(node.data.config)) return true;
+    return false;
+  }, [
+    label,
+    outputTableName,
+    config,
+    node.data.label,
+    node.data.outputTableName,
+    node.data.config,
+  ]);
+
   const handleSave = () => {
     onUpdate(node.id, {
       label,
@@ -74,8 +123,21 @@ function StageConfigForm({ node, onUpdate, onDelete }: StageConfigFormProps) {
     });
   };
 
+  const requestDelete = () => {
+    if (!confirmBeforeDelete) {
+      onDelete(node.id);
+      return;
+    }
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    setDeleteDialogOpen(false);
+    onDelete(node.id);
+  };
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="grid h-full min-h-0 w-full flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden">
       <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div className="flex items-center gap-2">
           <span
@@ -89,41 +151,117 @@ function StageConfigForm({ node, onUpdate, onDelete }: StageConfigFormProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => onDelete(node.id)}
+          onClick={requestDelete}
           aria-label="Delete stage"
         >
           <Trash2 className="h-4 w-4 text-gray-500" />
         </Button>
       </header>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        <Field label="Display label">
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g. Filter US customers"
-          />
-        </Field>
+      <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
+        <div className="space-y-4">
+          <Field label="Display label">
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="e.g. Filter US customers"
+            />
+          </Field>
 
-        <Field label="Output table name">
-          <Input
-            value={outputTableName}
-            onChange={(e) => setOutputTableName(e.target.value)}
-            placeholder="auto-generated if blank"
-          />
-        </Field>
+          <Field label="Output table name">
+            <Input
+              value={outputTableName}
+              onChange={(e) => setOutputTableName(e.target.value)}
+              placeholder="auto-generated if blank"
+            />
+          </Field>
 
-        <div className="border-t border-gray-200 pt-4">
-          <ConfigFields config={config} onChange={setConfig} />
+          <div className="border-t border-gray-200 pt-4">
+            <ConfigFields config={config} onChange={setConfig} />
+          </div>
         </div>
       </div>
 
-      <footer className="border-t border-gray-200 p-3">
-        <Button onClick={handleSave} className="w-full gap-2">
-          <Save className="h-4 w-4" />
-          Save changes
-        </Button>
+      <footer className="space-y-2 border-t border-gray-200 bg-white p-3">
+        {isDirty && (
+          <span aria-live="polite" className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Unsaved changes
+          </span>
+        )}
+        <div
+          className={
+            onCancel ? "grid w-full grid-cols-2 gap-2" : "grid w-full grid-cols-1"
+          }
+        >
+          {onCancel ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onCancel}
+                className="w-full justify-center"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={!isDirty}
+                className="w-full justify-center gap-1.5"
+              >
+                <Save className="h-3.5 w-3.5 shrink-0" />
+                Save
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSave}
+              disabled={!isDirty}
+              className="w-full justify-center gap-1.5"
+            >
+              <Save className="h-3.5 w-3.5 shrink-0" />
+              Save
+            </Button>
+          )}
+        </div>
       </footer>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this stage?</DialogTitle>
+            <DialogDescription>
+              This removes{" "}
+              <span className="font-medium text-gray-700">{node.data.label}</span>
+              {" "}
+              and its connections from the canvas. This cannot be undone here.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid w-full grid-cols-2 gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-center"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="w-full justify-center"
+              onClick={confirmDelete}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
