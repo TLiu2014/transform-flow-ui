@@ -1,6 +1,6 @@
 // Components
 export { TransformationFlow } from "./components/flow/TransformationFlow";
-export type { TransformationFlowProps } from "./components/flow/TransformationFlow";
+export type { TransformationFlowProps, TransformationFlowHandle } from "./components/flow/TransformationFlow";
 export { StageNode } from "./components/flow/StageNode";
 export { FlowCanvasToolbar } from "./components/flow/FlowCanvasToolbar";
 export type { FlowCanvasToolbarProps } from "./components/flow/FlowCanvasToolbar";

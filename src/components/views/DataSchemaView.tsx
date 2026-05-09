@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   inferOutputSchemas,
   type StageOutputSchema,
@@ -8,8 +8,9 @@ import { STAGE_COLORS } from "@/types/Pipeline";
 
 export interface DataSchemaViewProps {
   schema: PipelineSchema;
-  activeStageId: string | null;
-  onActiveStageIdChange: (stageId: string) => void;
+  /** Active tab. Omit to let the component manage its own state. */
+  activeStageId?: string | null;
+  onActiveStageIdChange?: (stageId: string) => void;
 }
 
 export function DataSchemaView({
@@ -17,11 +18,53 @@ export function DataSchemaView({
   activeStageId,
   onActiveStageIdChange,
 }: DataSchemaViewProps) {
-  const inferences = useMemo(() => inferOutputSchemas(schema), [schema]);
-  const stages = schema.stages;
-  const activeId = activeStageId;
+  const isControlled = activeStageId !== undefined;
+  const [internalActiveId, setInternalActiveId] = useState<string | null>(
+    schema.stages[0]?.id ?? null,
+  );
 
-  if (stages.length === 0) {
+  // Stable tab order: new stages append at end, deleted stages removed,
+  // existing stages never reorder (survives topology changes and orphaning).
+  const [tabOrder, setTabOrder] = useState<string[]>(() =>
+    schema.stages.map((s) => s.id),
+  );
+
+  useEffect(() => {
+    const schemaIds = new Set(schema.stages.map((s) => s.id));
+    setTabOrder((prev) => {
+      const kept = prev.filter((id) => schemaIds.has(id));
+      const keptSet = new Set(kept);
+      const newIds = schema.stages.map((s) => s.id).filter((id) => !keptSet.has(id));
+      if (newIds.length === 0 && kept.length === prev.length) return prev;
+      return [...kept, ...newIds];
+    });
+  }, [schema.stages]);
+
+  // Keep internal active id valid when tab order changes.
+  useEffect(() => {
+    if (isControlled) return;
+    if (internalActiveId && tabOrder.includes(internalActiveId)) return;
+    setInternalActiveId(tabOrder[0] ?? null);
+  }, [tabOrder, internalActiveId, isControlled]);
+
+  const activeId = isControlled ? activeStageId : internalActiveId;
+
+  const handleActiveChange = (id: string) => {
+    if (!isControlled) setInternalActiveId(id);
+    onActiveStageIdChange?.(id);
+  };
+
+  const inferences = useMemo(() => inferOutputSchemas(schema), [schema]);
+  const stageById = useMemo(
+    () => new Map(schema.stages.map((s) => [s.id, s])),
+    [schema.stages],
+  );
+  const orderedStages = useMemo(
+    () => tabOrder.map((id) => stageById.get(id)).filter(Boolean) as typeof schema.stages,
+    [tabOrder, stageById],
+  );
+
+  if (orderedStages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-500">
         No stages yet. Add a stage on the canvas, or load a pipeline JSON to
@@ -31,18 +74,18 @@ export function DataSchemaView({
   }
 
   const activeInf = activeId ? inferences.get(activeId) : null;
-  const activeStage = stages.find((s) => s.id === activeId);
+  const activeStage = orderedStages.find((s) => s.id === activeId);
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-9 items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-2">
-        {stages.map((s) => {
+        {orderedStages.map((s) => {
           const isActive = s.id === activeId;
           return (
             <button
               key={s.id}
               type="button"
-              onClick={() => onActiveStageIdChange(s.id)}
+              onClick={() => handleActiveChange(s.id)}
               className={
                 "inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-1.5 text-sm font-medium transition-colors " +
                 (isActive

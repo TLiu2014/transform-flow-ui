@@ -7,27 +7,24 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  deserializePipeline,
   validatePipelineSchema,
-  type DeserializedPipeline,
   type PipelineSchema,
 } from "@/Schema";
 
 /**
  * One entry in the optional sample-pipeline list shown at the top of the
- * panel. The host is responsible for shipping the JSON files and
- * deserializing them; the panel just renders cards and forwards clicks.
+ * panel. The host ships the JSON files; the panel just renders cards and
+ * forwards clicks.
  */
 export interface SamplePipelineEntry {
   id: string;
   label: string;
   description?: string;
   schema: PipelineSchema;
-  pipeline: DeserializedPipeline;
 }
 
 export interface PipelineIOPanelProps {
-  onLoad: (pipeline: DeserializedPipeline) => void;
+  onLoad: (schema: PipelineSchema) => void;
   /** Optional one-click sample pipelines shown at the top of the panel. */
   samples?: SamplePipelineEntry[];
 }
@@ -59,7 +56,7 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
       return;
     }
     const schema = parsed as PipelineSchema;
-    onLoad(deserializePipeline(schema));
+    onLoad(schema);
     setStatus({
       kind: "ok",
       message: `Loaded "${schema.pipeline.name}" from ${sourceLabel} (${schema.stages.length} stages)`,
@@ -82,7 +79,7 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
   };
 
   const handleSample = (entry: SamplePipelineEntry) => {
-    onLoad(entry.pipeline);
+    onLoad(entry.schema);
     setText(JSON.stringify(entry.schema, null, 2));
     setStatus({
       kind: "ok",

@@ -116,11 +116,14 @@ function StageConfigForm({
   ]);
 
   const handleSave = () => {
-    onUpdate(node.id, {
-      label,
-      config,
-      outputTableName: outputTableName || undefined,
-    });
+    if (isDirty) {
+      onUpdate(node.id, {
+        label,
+        config,
+        outputTableName: outputTableName || undefined,
+      });
+    }
+    onCancel?.();
   };
 
   const requestDelete = () => {
@@ -209,7 +212,6 @@ function StageConfigForm({
                 type="button"
                 size="sm"
                 onClick={handleSave}
-                disabled={!isDirty}
                 className="w-full justify-center gap-1.5"
               >
                 <Save className="h-3.5 w-3.5 shrink-0" />

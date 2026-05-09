@@ -119,92 +119,56 @@ import "@xyflow/react/dist/style.css";
 
 ### Module 1 — Transformation Flow
 
-`TransformationFlow` owns the canvas and the edit panel. The host app owns `nodes` / `edges` state and handles add/update/delete.
+`TransformationFlow` owns all canvas state internally. The host works purely in `PipelineSchema` JSON — no React Flow types needed.
 
 ```tsx
-import { useState } from "react";
-import { useNodesState, useEdgesState, addEdge, type Node } from "@xyflow/react";
+import { useRef, useState } from "react";
 import {
   TransformationFlow, FlowCanvasToolbar,
-  defaultConfigFor, STAGE_LABELS,
-  type StageNodeData, type StageType,
+  type PipelineSchema, type StageType, type TransformationFlowHandle,
 } from "transform-flow-ui";
 
 export function PipelineEditor() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<StageNodeData>>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [toolbarOpen, setToolbarOpen] = useState(true);
-
-  const editingNode = nodes.find(n => n.id === editingId) ?? null;
-
-  const addStage = (stageType: StageType) => {
-    const id = crypto.randomUUID();
-    setNodes(ns => [...ns, {
-      id, type: "stageNode",
-      position: { x: 100, y: 80 + ns.length * 120 },
-      data: {
-        stageType, stageIndex: ns.length + 1,
-        label: `${STAGE_LABELS[stageType]} #${ns.length + 1}`,
-        config: defaultConfigFor(stageType),
-      },
-    }]);
-    setEditingId(id);
-  };
+  const [schema, setSchema] = useState<PipelineSchema | null>(null);
+  const flowRef = useRef<TransformationFlowHandle>(null);
 
   return (
     <div style={{ position: "relative", height: "100vh" }}>
       <FlowCanvasToolbar
-        expanded={toolbarOpen} onExpandedChange={setToolbarOpen}
-        onAddStage={addStage}
-        editPanelPosition="right" onEditPanelPositionChange={() => {}}
+        onAddStage={(type: StageType) => flowRef.current?.addStage(type)}
       />
       <TransformationFlow
-        nodes={nodes} edges={edges}
-        onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-        onConnect={c => setEdges(es => addEdge(c, es))}
-        onNodeClick={n => setEditingId(n.id)}
-        onNodeDoubleClick={n => setEditingId(n.id)}
-        onPaneClick={() => setEditingId(null)}
-        onEditNode={setEditingId}
-        selectedNodeId={editingId}
-        // Edit panel — "popover" (default) or "panel" (right sidebar)
-        editingNode={editingNode}
+        ref={flowRef}
+        schema={schema}
+        onChange={setSchema}
         configDisplayMode="panel"
-        onUpdateNode={(id, patch) =>
-          setNodes(ns => ns.map(n =>
-            n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))}
-        onDeleteNode={id => {
-          setNodes(ns => ns.filter(n => n.id !== id));
-          setEdges(es => es.filter(e => e.source !== id && e.target !== id));
-          setEditingId(cur => cur === id ? null : cur);
-        }}
-        onCancelEdit={() => setEditingId(null)}
       />
     </div>
   );
 }
 ```
 
-**`configDisplayMode` options:**
+**`TransformationFlow` props:**
 
-| Value | Behaviour |
+| Prop | Description |
 |---|---|
-| `"popover"` *(default)* | Edit form floats next to the selected node as a NodeToolbar popover. |
-| `"panel"` | Edit form is pinned as a fixed-width right sidebar inside the component. |
+| `schema` | Pipeline to load. Pass a new reference to reload the canvas (e.g. when the user picks a sample). |
+| `onChange` | Fires after every meaningful edit. Keep `schema` in sync so the schema viewers stay live. |
+| `configDisplayMode` | `"popover"` *(default)* or `"panel"` (right sidebar). |
+| `nodeToolbarPosition` | Which side the popover attaches to (default `Right`). |
+| `confirmBeforeDelete` | Show a confirm dialog before deleting (default `true`). |
+| `onShowOutput` | Called when the user clicks a stage's output-table link. |
 
-#### Serialize to JSON
+**`TransformationFlowHandle` (via `ref`):**
 
-```ts
-import { serializePipeline } from "transform-flow-ui";
-
-const schema = serializePipeline(nodes, edges, { name: "my-pipeline" });
-```
+| Method | Description |
+|---|---|
+| `addStage(stageType)` | Adds a new stage to the canvas and opens its edit form. |
 
 #### Load a schema onto the canvas
 
 ```ts
-import { deserializePipeline, validatePipelineSchema } from "transform-flow-ui";
+import { validatePipelineSchema } from "transform-flow-ui";
 
 const err = validatePipelineSchema(raw);
 if (err) throw new Error(err);
@@ -219,29 +183,17 @@ setEdges(edges);
 
 Pass any `PipelineSchema` — from `serializePipeline` or a saved file. No canvas needed.
 
-```tsx
-import { DataSchemaView, JsonView, serializePipeline } from "transform-flow-ui";
-
-const schema = serializePipeline(nodes, edges, { name: "my-pipeline" });
-```
+Use the `schema` from `TransformationFlow`'s `onChange` (or load one from a saved file):
 
 ```tsx
-// Per-stage inferred output columns
-<DataSchemaView
-  schema={schema}
-  activeStageId={activeStageId}
-  onActiveStageIdChange={setActiveStageId}
-/>
-```
+// Per-stage inferred output columns — manages its own active tab internally
+<DataSchemaView schema={schema} />
 
-```tsx
 // Raw JSON with copy / download
-<JsonView
-  schema={schema}
-  refreshTick={tick}
-  onRefresh={() => setTick(t => t + 1)}
-/>
+<JsonView schema={schema} />
 ```
+
+Both are self-contained. `DataSchemaView` accepts optional `activeStageId` / `onActiveStageIdChange` if you need external tab control.
 
 ---
 

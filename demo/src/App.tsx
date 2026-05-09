@@ -1,19 +1,11 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import {
-  Position,
-  addEdge,
-  useEdgesState,
-  useNodesState,
-  type Connection,
-  type Edge,
-  type Node,
-} from "@xyflow/react";
+import { Position } from "@xyflow/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import {
@@ -22,14 +14,11 @@ import {
   JsonView,
   PipelineIOPanel,
   TransformationFlow,
-  defaultConfigFor,
-  serializePipeline,
-  STAGE_LABELS,
   type DatasetSchema,
-  type DeserializedPipeline,
+  type PipelineSchema,
   type SerializedStage,
-  type StageNodeData,
   type StageType,
+  type TransformationFlowHandle,
 } from "transform-flow-ui";
 
 import {
@@ -38,8 +27,7 @@ import {
 } from "./SettingsMenu";
 import {
   INITIAL_PIPELINE_NAME,
-  INITIAL_SAMPLE_EDGES,
-  INITIAL_SAMPLE_NODES,
+  INITIAL_SCHEMA,
   SAMPLE_DATASET_SCHEMAS,
   SAMPLE_PIPELINES,
 } from "./SampleData";
@@ -47,155 +35,49 @@ import {
 type BottomTab = "schema" | "json";
 
 export default function App() {
-  const [nodes, setNodes, onNodesChange] =
-    useNodesState<Node<StageNodeData>>(INITIAL_SAMPLE_NODES);
-  const [edges, setEdges, onEdgesChange] =
-    useEdgesState<Edge>(INITIAL_SAMPLE_EDGES);
-  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(
-    null,
-  );
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  // Canvas schema — updated by TransformationFlow via onChange.
+  const [canvasSchema, setCanvasSchema] = useState<PipelineSchema>(INITIAL_SCHEMA);
+  // Pipeline name is kept separate so the name input doesn't reload the canvas.
   const [pipelineName, setPipelineName] = useState(INITIAL_PIPELINE_NAME);
-  const [activeSchemaId, setActiveSchemaId] = useState<string | null>(
-    INITIAL_SAMPLE_NODES[0]?.id ?? null,
-  );
+
   const [appSettings, setAppSettings] = useState<AppSettings>({
     configDisplayMode: "popover",
     bottomPanelLayout: "split",
     confirmBeforeDelete: true,
   });
+  const [activeSchemaId, setActiveSchemaId] = useState<string | null>(
+    INITIAL_SCHEMA.stages[0]?.id ?? null,
+  );
   const [bottomTab, setBottomTab] = useState<BottomTab>("schema");
-  const [refreshTick, setRefreshTick] = useState(0);
   const [flowToolbarExpanded, setFlowToolbarExpanded] = useState(true);
   const [editPanelPosition, setEditPanelPosition] = useState(Position.Right);
 
-  const editingNode = useMemo(
-    () => nodes.find((n) => n.id === editingNodeId) ?? null,
-    [nodes, editingNodeId],
-  );
+  // Ref to the canvas — used to imperatively add stages from the toolbar.
+  const flowRef = useRef<TransformationFlowHandle>(null);
 
-  const liveSchema = useMemo(() => {
-    const schema = serializePipeline(nodes, edges, { name: pipelineName });
-    return {
-      ...schema,
+  // Schema shown to viewers merges the live canvas schema with the current
+  // pipeline name and any known dataset column info.
+  const viewSchema = useMemo(
+    () => ({
+      ...canvasSchema,
+      pipeline: { ...canvasSchema.pipeline, name: pipelineName },
       datasets: {
-        ...schema.datasets,
-        ...datasetsFromSamples(schema.stages),
+        ...canvasSchema.datasets,
+        ...datasetsFromSamples(canvasSchema.stages),
       },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, pipelineName, refreshTick]);
-
-  // Keep activeSchemaId valid when stages are added/removed.
-  useEffect(() => {
-    if (activeSchemaId && nodes.some((n) => n.id === activeSchemaId)) return;
-    setActiveSchemaId(nodes[0]?.id ?? null);
-  }, [nodes, activeSchemaId]);
-
-  // Drop the editing node if it gets removed from the canvas.
-  useEffect(() => {
-    if (editingNodeId && !nodes.some((n) => n.id === editingNodeId)) {
-      setEditingNodeId(null);
-    }
-  }, [nodes, editingNodeId]);
-
-  const handleConnect = useCallback(
-    (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
-    [setEdges],
+    }),
+    [canvasSchema, pipelineName],
   );
 
-  const handleAddStage = useCallback(
-    (stageType: StageType) => {
-      const id = `n${Date.now().toString(36)}`;
-      const stageIndex = nodes.length + 1;
-      const newNode: Node<StageNodeData> = {
-        id,
-        type: "stageNode",
-        position: { x: 80 + (stageIndex % 3) * 60, y: 80 + stageIndex * 80 },
-        data: {
-          stageType,
-          label: `${STAGE_LABELS[stageType]} #${stageIndex}`,
-          stageIndex,
-          config: defaultConfigFor(stageType),
-          outputTableName: `${stageType.toLowerCase()}_${stageIndex}`,
-        },
-      };
-      setNodes((ns) => [...ns, newNode]);
-      setHighlightedNodeId(id);
-      setEditingNodeId(id);
-    },
-    [nodes.length, setNodes],
-  );
-
-  const handleUpdateNode = useCallback(
-    (id: string, patch: Partial<StageNodeData>) => {
-      setNodes((ns) =>
-        ns.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
-        ),
-      );
-    },
-    [setNodes],
-  );
-
-  const handleDeleteNode = useCallback(
-    (id: string) => {
-      setNodes((ns) => ns.filter((n) => n.id !== id));
-      setEdges((es) => es.filter((e) => e.source !== id && e.target !== id));
-      setEditingNodeId((curr) => (curr === id ? null : curr));
-      setHighlightedNodeId((curr) => (curr === id ? null : curr));
-    },
-    [setNodes, setEdges],
-  );
-
-  const handleLoadPipeline = useCallback(
-    (pipeline: DeserializedPipeline) => {
-      setNodes(pipeline.nodes);
-      setEdges(pipeline.edges);
-      setPipelineName(pipeline.name);
-      setHighlightedNodeId(null);
-      setEditingNodeId(null);
-      setActiveSchemaId(pipeline.nodes[0]?.id ?? null);
-    },
-    [setNodes, setEdges],
-  );
-
-  const handleNodeClick = useCallback(
-    (node: Node<StageNodeData>) => {
-      setHighlightedNodeId(node.id);
-      if (appSettings.configDisplayMode === "panel") {
-        setEditingNodeId(node.id);
-      }
-    },
-    [appSettings.configDisplayMode],
-  );
-
-  const handleNodeDoubleClick = useCallback((node: Node<StageNodeData>) => {
-    setHighlightedNodeId(node.id);
-    setEditingNodeId(node.id);
-  }, []);
-
-  const handleEditFromNode = useCallback((stageId: string) => {
-    setHighlightedNodeId(stageId);
-    setEditingNodeId(stageId);
-  }, []);
-
-  const handlePaneClick = useCallback(() => {
-    setHighlightedNodeId(null);
-    if (appSettings.configDisplayMode !== "popover") {
-      setEditingNodeId(null);
-    }
-  }, [appSettings.configDisplayMode]);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingNodeId(null);
+  const handleLoadPipeline = useCallback((schema: PipelineSchema) => {
+    setCanvasSchema(schema);
+    setPipelineName(schema.pipeline.name);
+    setActiveSchemaId(schema.stages[0]?.id ?? null);
   }, []);
 
   const patchAppSettings = useCallback((patch: Partial<AppSettings>) => {
     setAppSettings((s) => ({ ...s, ...patch }));
   }, []);
-
-  const ringNodeId = editingNodeId ?? highlightedNodeId;
 
   return (
     <div className="flex h-screen flex-col bg-gray-50">
@@ -252,29 +134,18 @@ export default function App() {
                   onExpandedChange={setFlowToolbarExpanded}
                   editPanelPosition={editPanelPosition}
                   onEditPanelPositionChange={setEditPanelPosition}
-                  onAddStage={handleAddStage}
+                  onAddStage={(type: StageType) => flowRef.current?.addStage(type)}
                 />
                 <TransformationFlow
-                  nodes={nodes}
-                  edges={edges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={handleConnect}
-                  onNodeClick={handleNodeClick}
-                  onNodeDoubleClick={handleNodeDoubleClick}
-                  onPaneClick={handlePaneClick}
-                  selectedNodeId={ringNodeId}
-                  nodeToolbarPosition={editPanelPosition}
+                  ref={flowRef}
+                  schema={canvasSchema}
+                  onChange={setCanvasSchema}
                   onShowOutput={(stageId) => {
                     setActiveSchemaId(stageId);
                     setBottomTab("schema");
                   }}
-                  onEditNode={handleEditFromNode}
-                  editingNode={editingNode}
                   configDisplayMode={appSettings.configDisplayMode}
-                  onUpdateNode={handleUpdateNode}
-                  onDeleteNode={handleDeleteNode}
-                  onCancelEdit={handleCancelEdit}
+                  nodeToolbarPosition={editPanelPosition}
                   confirmBeforeDelete={appSettings.confirmBeforeDelete}
                 />
               </section>
@@ -290,16 +161,12 @@ export default function App() {
                     <div className="min-h-0 flex-1 overflow-hidden">
                       {bottomTab === "schema" ? (
                         <DataSchemaView
-                          schema={liveSchema}
+                          schema={viewSchema}
                           activeStageId={activeSchemaId}
                           onActiveStageIdChange={setActiveSchemaId}
                         />
                       ) : (
-                        <JsonView
-                          schema={liveSchema}
-                          refreshTick={refreshTick}
-                          onRefresh={() => setRefreshTick((t) => t + 1)}
-                        />
+                        <JsonView schema={viewSchema} />
                       )}
                     </div>
                   </>
@@ -314,10 +181,10 @@ export default function App() {
                         <SplitPanelLabel>Data schema</SplitPanelLabel>
                         <div className="min-h-0 flex-1 overflow-hidden">
                           <DataSchemaView
-                            schema={liveSchema}
-                            activeStageId={activeSchemaId}
-                            onActiveStageIdChange={setActiveSchemaId}
-                          />
+                          schema={viewSchema}
+                          activeStageId={activeSchemaId}
+                          onActiveStageIdChange={setActiveSchemaId}
+                        />
                         </div>
                       </div>
                     </Panel>
@@ -328,11 +195,7 @@ export default function App() {
                       <div className="flex h-full min-w-0 flex-col overflow-hidden">
                         <SplitPanelLabel>Pipeline JSON</SplitPanelLabel>
                         <div className="min-h-0 flex-1 overflow-hidden">
-                          <JsonView
-                            schema={liveSchema}
-                            refreshTick={refreshTick}
-                            onRefresh={() => setRefreshTick((t) => t + 1)}
-                          />
+                          <JsonView schema={viewSchema} />
                         </div>
                       </div>
                     </Panel>

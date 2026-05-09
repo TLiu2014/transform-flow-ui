@@ -1,5 +1,4 @@
 import {
-  deserializePipeline,
   type DatasetSchema,
   type PipelineSchema,
   type SamplePipelineEntry,
@@ -23,14 +22,12 @@ export const SAMPLE_PIPELINES: SamplePipelineEntry[] = (
   label: s.label,
   description: s.description,
   schema: s.schema,
-  pipeline: deserializePipeline(s.schema),
 }));
 
 const DEFAULT_SAMPLE = SAMPLE_PIPELINES[0]!;
 
-export const INITIAL_PIPELINE_NAME = DEFAULT_SAMPLE.pipeline.name;
-export const INITIAL_SAMPLE_NODES = DEFAULT_SAMPLE.pipeline.nodes;
-export const INITIAL_SAMPLE_EDGES = DEFAULT_SAMPLE.pipeline.edges;
+export const INITIAL_SCHEMA = DEFAULT_SAMPLE.schema;
+export const INITIAL_PIPELINE_NAME = DEFAULT_SAMPLE.schema.pipeline.name;
 
 export const SAMPLE_DATASET_SCHEMAS: Record<string, DatasetSchema> =
   Object.fromEntries(

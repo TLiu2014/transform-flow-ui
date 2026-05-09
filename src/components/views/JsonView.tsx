@@ -5,26 +5,18 @@ import {
   Download,
   Minus,
   Plus,
-  RefreshCw,
 } from "lucide-react";
 import type { PipelineSchema } from "@/Schema";
 
 export interface JsonViewProps {
   schema: PipelineSchema;
-  /**
-   * Bumped externally to signal "the schema you're showing is the latest
-   * snapshot." Useful so the user gets visible feedback after pressing
-   * Refresh — the panel briefly flashes a tick.
-   */
-  refreshTick: number;
-  onRefresh: () => void;
 }
 
 const JSON_FONT_MIN_PX = 9;
 const JSON_FONT_MAX_PX = 22;
 const JSON_FONT_DEFAULT_PX = 11;
 
-export function JsonView({ schema, refreshTick, onRefresh }: JsonViewProps) {
+export function JsonView({ schema }: JsonViewProps) {
   const json = JSON.stringify(schema, null, 2);
   const [copied, setCopied] = useState(false);
   const [fontSizePx, setFontSizePx] = useState(JSON_FONT_DEFAULT_PX);
@@ -70,9 +62,6 @@ export function JsonView({ schema, refreshTick, onRefresh }: JsonViewProps) {
           <span>{schema.stages.length} stages</span>
           <span>·</span>
           <span>{Object.keys(schema.datasets).length} datasets</span>
-          <span className="hidden text-gray-400 sm:inline">
-            · synced #{refreshTick}
-          </span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="mr-1 flex items-center gap-0.5 rounded border border-gray-300 bg-white px-0.5 shadow-sm">
@@ -103,9 +92,6 @@ export function JsonView({ schema, refreshTick, onRefresh }: JsonViewProps) {
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
-          <ToolbarButton onClick={onRefresh} icon={RefreshCw}>
-            Refresh
-          </ToolbarButton>
           <ToolbarButton onClick={handleDownload} icon={Download}>
             Download
           </ToolbarButton>
