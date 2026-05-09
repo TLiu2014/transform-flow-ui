@@ -17,6 +17,7 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  reconnectEdge,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -27,6 +28,7 @@ import {
 } from "@xyflow/react";
 
 import { StageConfigUI } from "@/components/config/StageConfigUI";
+import { FlowCanvasToolbar } from "@/components/flow/FlowCanvasToolbar";
 import { deserializePipeline, serializePipeline, type PipelineSchema } from "@/Schema";
 import { STAGE_COLORS, STAGE_LABELS, defaultConfigFor, type StageNodeData, type StageType } from "@/types/Pipeline";
 import {
@@ -62,8 +64,6 @@ export interface TransformationFlowProps {
    * Defaults to "popover".
    */
   configDisplayMode?: "popover" | "panel";
-  /** Which side the popover attaches to (default Right). */
-  nodeToolbarPosition?: Position;
   confirmBeforeDelete?: boolean;
 }
 
@@ -87,7 +87,6 @@ export const TransformationFlow = forwardRef<
     onChange,
     onShowOutput,
     configDisplayMode = "popover",
-    nodeToolbarPosition = Position.Right,
     confirmBeforeDelete = true,
   },
   ref,
@@ -96,6 +95,8 @@ export const TransformationFlow = forwardRef<
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [toolbarExpanded, setToolbarExpanded] = useState(true);
+  const [popoverPosition, setPopoverPosition] = useState<Position>(Position.Right);
 
   // Refs always hold the latest render values — safe to use in callbacks.
   const nodesRef = useRef(nodes);
@@ -197,6 +198,15 @@ export const TransformationFlow = forwardRef<
     [emit],
   );
 
+  const handleReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      const newEdges = reconnectEdge(oldEdge, newConnection, edgesRef.current);
+      setEdges(newEdges);
+      emit(nodesRef.current, newEdges);
+    },
+    [emit],
+  );
+
   // ── Node interaction ─────────────────────────────────────────────────────
 
   const handleNodeClick = (node: Node<StageNodeData>) => {
@@ -249,36 +259,35 @@ export const TransformationFlow = forwardRef<
 
   // ── Imperative handle (addStage) ─────────────────────────────────────────
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      addStage: (stageType: StageType) => {
-        const id = `n${Date.now().toString(36)}`;
-        const stageIndex = nodesRef.current.length + 1;
-        const newNode: Node<StageNodeData> = {
-          id,
-          type: "stageNode",
-          position: {
-            x: 80 + (stageIndex % 3) * 60,
-            y: 80 + stageIndex * 80,
-          },
-          data: {
-            stageType,
-            label: `${STAGE_LABELS[stageType]} #${stageIndex}`,
-            stageIndex,
-            config: defaultConfigFor(stageType),
-            outputTableName: `${stageType.toLowerCase()}_${stageIndex}`,
-          },
-        };
-        const newNodes = [...nodesRef.current, newNode];
-        setNodes(newNodes);
-        setSelectedNodeId(id);
-        setEditingNodeId(id);
-        emit(newNodes, edgesRef.current);
-      },
-    }),
+  const addStage = useCallback(
+    (stageType: StageType) => {
+      const id = `n${Date.now().toString(36)}`;
+      const stageIndex = nodesRef.current.length + 1;
+      const newNode: Node<StageNodeData> = {
+        id,
+        type: "stageNode",
+        position: {
+          x: 80 + (stageIndex % 3) * 60,
+          y: 80 + stageIndex * 80,
+        },
+        data: {
+          stageType,
+          label: `${STAGE_LABELS[stageType]} #${stageIndex}`,
+          stageIndex,
+          config: defaultConfigFor(stageType),
+          outputTableName: `${stageType.toLowerCase()}_${stageIndex}`,
+        },
+      };
+      const newNodes = [...nodesRef.current, newNode];
+      setNodes(newNodes);
+      setSelectedNodeId(id);
+      setEditingNodeId(id);
+      emit(newNodes, edgesRef.current);
+    },
     [emit],
   );
+
+  useImperativeHandle(ref, () => ({ addStage }), [addStage]);
 
   // ── Derived state for render ─────────────────────────────────────────────
 
@@ -300,15 +309,23 @@ export const TransformationFlow = forwardRef<
 
   return (
     <StageNodeContext.Provider value={callbacks}>
-      <NodeToolbarPositionProvider value={nodeToolbarPosition}>
-        <div className="flex h-full min-h-0">
+      <NodeToolbarPositionProvider value={popoverPosition}>
+        <div className="flex h-full min-h-[480px]">
           <div className="relative min-w-0 flex-1">
+            <FlowCanvasToolbar
+              expanded={toolbarExpanded}
+              onExpandedChange={setToolbarExpanded}
+              editPanelPosition={popoverPosition}
+              onEditPanelPositionChange={setPopoverPosition}
+              onAddStage={addStage}
+            />
             <ReactFlow
               nodes={decoratedNodes}
               edges={edges}
               onNodesChange={handleNodesChange}
               onEdgesChange={handleEdgesChange}
               onConnect={handleConnect}
+              onReconnect={handleReconnect}
               onNodeClick={(_, node) => handleNodeClick(node as Node<StageNodeData>)}
               onNodeDoubleClick={(_, node) => handleNodeDoubleClick(node as Node<StageNodeData>)}
               onNodeDragStop={() => emit(nodesRef.current, edgesRef.current)}

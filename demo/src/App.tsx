@@ -5,19 +5,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Position } from "@xyflow/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import {
   DataSchemaView,
-  FlowCanvasToolbar,
   JsonView,
   PipelineIOPanel,
   TransformationFlow,
   type DatasetSchema,
   type PipelineSchema,
   type SerializedStage,
-  type StageType,
   type TransformationFlowHandle,
 } from "transform-flow-ui";
 
@@ -49,9 +46,6 @@ export default function App() {
     INITIAL_SCHEMA.stages[0]?.id ?? null,
   );
   const [bottomTab, setBottomTab] = useState<BottomTab>("schema");
-  const [flowToolbarExpanded, setFlowToolbarExpanded] = useState(true);
-  const [editPanelPosition, setEditPanelPosition] = useState(Position.Right);
-
   // Ref to the canvas — used to imperatively add stages from the toolbar.
   const flowRef = useRef<TransformationFlowHandle>(null);
 
@@ -129,13 +123,6 @@ export default function App() {
           >
             <Panel defaultSize="60" minSize="25">
               <section className="relative h-full bg-white">
-                <FlowCanvasToolbar
-                  expanded={flowToolbarExpanded}
-                  onExpandedChange={setFlowToolbarExpanded}
-                  editPanelPosition={editPanelPosition}
-                  onEditPanelPositionChange={setEditPanelPosition}
-                  onAddStage={(type: StageType) => flowRef.current?.addStage(type)}
-                />
                 <TransformationFlow
                   ref={flowRef}
                   schema={canvasSchema}
@@ -145,7 +132,6 @@ export default function App() {
                     setBottomTab("schema");
                   }}
                   configDisplayMode={appSettings.configDisplayMode}
-                  nodeToolbarPosition={editPanelPosition}
                   confirmBeforeDelete={appSettings.confirmBeforeDelete}
                 />
               </section>

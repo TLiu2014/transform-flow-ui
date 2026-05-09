@@ -1,8 +1,10 @@
 import { memo } from "react";
 import {
   BaseEdge,
+  EdgeLabelRenderer,
   getBezierPath,
   useInternalNode,
+  useReactFlow,
   type EdgeProps,
 } from "@xyflow/react";
 import { STAGE_COLORS, type StageNodeData } from "@/types/Pipeline";
@@ -19,14 +21,16 @@ function GradientEdgeImpl({
   targetY,
   sourcePosition,
   targetPosition,
+  selected,
 }: EdgeProps) {
+  const { deleteElements } = useReactFlow();
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
   const sourceColor = colorFor(sourceNode?.data) ?? FALLBACK_COLOR;
   const targetColor = colorFor(targetNode?.data) ?? FALLBACK_COLOR;
 
-  const [path] = getBezierPath({
+  const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -69,6 +73,22 @@ function GradientEdgeImpl({
         markerEnd={`url(#${markerId})`}
         style={{ stroke: `url(#${gradientId})`, strokeWidth: 2.5 }}
       />
+      {selected && (
+        <EdgeLabelRenderer>
+          <button
+            type="button"
+            aria-label="Delete connection"
+            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full bg-white text-gray-500 shadow-md ring-1 ring-gray-300 hover:bg-red-50 hover:text-red-600 hover:ring-red-400"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: "all",
+            }}
+            onClick={() => deleteElements({ edges: [{ id }] })}
+          >
+            ×
+          </button>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 }

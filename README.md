@@ -12,8 +12,8 @@ A self-contained canvas + edit view. Drop it in and users can build, connect, an
 
 | Component | Role |
 |---|---|
-| `TransformationFlow` | Core canvas. Handles node layout, edge drawing, and the edit panel (popover or right-side panel). |
-| `FlowCanvasToolbar` | Optional overlay toolbar — "Add stage" menu and popover-position picker. |
+| `TransformationFlow` | Core canvas. Handles node layout, edge drawing, the built-in toolbar, and the edit panel (popover or right-side panel). |
+| `FlowCanvasToolbar` | The toolbar embedded inside `TransformationFlow`. Also exported for advanced composition outside the canvas. |
 | `StageConfigUI` | Stage config form in isolation — use when you want to host the form in your own panel layout. |
 | `AddStageMenu` | Standalone "Add stage" dropdown, composable anywhere. |
 | `SaveFlowButton` | Button that calls `serializePipeline` and fires `onSave(schema)`. |
@@ -122,30 +122,34 @@ import "@xyflow/react/dist/style.css";
 `TransformationFlow` owns all canvas state internally. The host works purely in `PipelineSchema` JSON — no React Flow types needed.
 
 ```tsx
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
-  TransformationFlow, FlowCanvasToolbar,
-  type PipelineSchema, type StageType, type TransformationFlowHandle,
+  TransformationFlow,
+  type PipelineSchema,
 } from "transform-flow-ui";
 
 export function PipelineEditor() {
   const [schema, setSchema] = useState<PipelineSchema | null>(null);
-  const flowRef = useRef<TransformationFlowHandle>(null);
 
   return (
-    <div style={{ position: "relative", height: "100vh" }}>
-      <FlowCanvasToolbar
-        onAddStage={(type: StageType) => flowRef.current?.addStage(type)}
-      />
-      <TransformationFlow
-        ref={flowRef}
-        schema={schema}
-        onChange={setSchema}
-        configDisplayMode="panel"
-      />
-    </div>
+    <TransformationFlow
+      schema={schema}
+      onChange={setSchema}
+      configDisplayMode="panel"
+    />
   );
 }
+```
+
+The built-in toolbar (Add stage menu + popover position picker) renders inside `TransformationFlow` automatically. To add stages programmatically from outside, use the ref:
+
+```tsx
+import { useRef } from "react";
+import { type TransformationFlowHandle } from "transform-flow-ui";
+
+const flowRef = useRef<TransformationFlowHandle>(null);
+// ...
+flowRef.current?.addStage("FILTER");
 ```
 
 **`TransformationFlow` props:**
@@ -155,7 +159,6 @@ export function PipelineEditor() {
 | `schema` | Pipeline to load. Pass a new reference to reload the canvas (e.g. when the user picks a sample). |
 | `onChange` | Fires after every meaningful edit. Keep `schema` in sync so the schema viewers stay live. |
 | `configDisplayMode` | `"popover"` *(default)* or `"panel"` (right sidebar). |
-| `nodeToolbarPosition` | Which side the popover attaches to (default `Right`). |
 | `confirmBeforeDelete` | Show a confirm dialog before deleting (default `true`). |
 | `onShowOutput` | Called when the user clicks a stage's output-table link. |
 
