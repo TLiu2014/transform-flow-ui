@@ -1,8 +1,8 @@
 import { Download } from "lucide-react";
 import type { Edge, Node } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
-import type { StageNodeData } from "@/types/pipeline";
-import { serializePipeline, type PipelineSchema } from "@/schema";
+import { Button } from "@/components/ui/Button";
+import type { StageNodeData } from "@/types/Pipeline";
+import { serializePipeline, type PipelineSchema } from "@/Schema";
 
 export interface SaveFlowButtonProps {
   name: string;

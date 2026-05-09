@@ -1,12 +1,18 @@
 // Components
 export { TransformationFlow } from "./components/flow/TransformationFlow";
-export { useNodeToolbarPosition } from "./components/flow/node-toolbar-position-context";
+export type { TransformationFlowProps } from "./components/flow/TransformationFlow";
 export { StageNode } from "./components/flow/StageNode";
 export { FlowCanvasToolbar } from "./components/flow/FlowCanvasToolbar";
 export type { FlowCanvasToolbarProps } from "./components/flow/FlowCanvasToolbar";
+export type {
+  StageEdgeHandleId,
+} from "./components/flow/StageEdgeHandles";
+export {
+  STAGE_EDGE_HANDLE_IDS,
+  DEFAULT_EDGE_SOURCE_HANDLE_ID,
+  DEFAULT_EDGE_TARGET_HANDLE_ID,
+} from "./components/flow/StageEdgeHandles";
 export { StageConfigUI } from "./components/config/StageConfigUI";
-export { ResultsTabView } from "./components/results/ResultsTabView";
-export { DataTable } from "./components/results/DataTable";
 export { SaveFlowButton } from "./components/toolbar/SaveFlowButton";
 export { AddStageMenu } from "./components/toolbar/AddStageMenu";
 export { DataSchemaView } from "./components/views/DataSchemaView";
@@ -39,9 +45,9 @@ export type {
   SelectConfig,
   CustomConfig,
   ExecutionState,
-} from "./types/pipeline";
+} from "./types/Pipeline";
 
-export { STAGE_COLORS, STAGE_LABELS, defaultConfigFor } from "./types/pipeline";
+export { STAGE_COLORS, STAGE_LABELS, defaultConfigFor } from "./types/Pipeline";
 
 // Schema
 export type {
@@ -55,29 +61,14 @@ export type {
   InferredColumn,
   StageOutputSchema,
   InferredSchemaMap,
-} from "./schema";
+} from "./Schema";
 
 export {
   serializePipeline,
   deserializePipeline,
   validatePipelineSchema,
   inferOutputSchemas,
-} from "./schema";
+} from "./Schema";
 
-// Mocks (for demos / quickstart)
-export type { MockTable } from "./mocks/tables";
-export {
-  MOCK_TABLES,
-  getMockResultFor,
-  mockCustomers,
-  mockOrders,
-  mockFilteredCustomers,
-  mockJoined,
-} from "./mocks/tables";
-export {
-  SAMPLE_NODES,
-  SAMPLE_EDGES,
-  SAMPLE_PIPELINE_NAME,
-} from "./mocks/pipeline";
 
 export type { SaveFlowButtonProps } from "./components/toolbar/SaveFlowButton";

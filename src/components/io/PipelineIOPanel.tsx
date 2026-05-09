@@ -11,7 +11,7 @@ import {
   validatePipelineSchema,
   type DeserializedPipeline,
   type PipelineSchema,
-} from "@/schema";
+} from "@/Schema";
 
 /**
  * One entry in the optional sample-pipeline list shown at the top of the

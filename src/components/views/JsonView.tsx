@@ -1,6 +1,13 @@
-import { useState } from "react";
-import { Check, Copy, Download, RefreshCw } from "lucide-react";
-import type { PipelineSchema } from "@/schema";
+import { useCallback, useState } from "react";
+import {
+  Check,
+  Copy,
+  Download,
+  Minus,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
+import type { PipelineSchema } from "@/Schema";
 
 export interface JsonViewProps {
   schema: PipelineSchema;
@@ -13,9 +20,22 @@ export interface JsonViewProps {
   onRefresh: () => void;
 }
 
+const JSON_FONT_MIN_PX = 9;
+const JSON_FONT_MAX_PX = 22;
+const JSON_FONT_DEFAULT_PX = 11;
+
 export function JsonView({ schema, refreshTick, onRefresh }: JsonViewProps) {
   const json = JSON.stringify(schema, null, 2);
   const [copied, setCopied] = useState(false);
+  const [fontSizePx, setFontSizePx] = useState(JSON_FONT_DEFAULT_PX);
+
+  const zoomOut = useCallback(() => {
+    setFontSizePx((s) => Math.max(JSON_FONT_MIN_PX, s - 1));
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    setFontSizePx((s) => Math.min(JSON_FONT_MAX_PX, s + 1));
+  }, []);
 
   const handleCopy = async () => {
     try {
@@ -54,7 +74,35 @@ export function JsonView({ schema, refreshTick, onRefresh }: JsonViewProps) {
             · synced #{refreshTick}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mr-1 flex items-center gap-0.5 rounded border border-gray-300 bg-white px-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={fontSizePx <= JSON_FONT_MIN_PX}
+              title="Smaller text"
+              aria-label="Smaller text"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-600 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <span
+              className="min-w-[2.25rem] select-none text-center font-mono text-[10px] text-gray-500"
+              title="JSON font size"
+            >
+              {fontSizePx}px
+            </span>
+            <button
+              type="button"
+              onClick={zoomIn}
+              disabled={fontSizePx >= JSON_FONT_MAX_PX}
+              title="Larger text"
+              aria-label="Larger text"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-600 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <ToolbarButton onClick={onRefresh} icon={RefreshCw}>
             Refresh
           </ToolbarButton>
@@ -70,7 +118,10 @@ export function JsonView({ schema, refreshTick, onRefresh }: JsonViewProps) {
           </ToolbarButton>
         </div>
       </header>
-      <pre className="flex-1 overflow-auto bg-gray-950 p-4 font-mono text-[11px] leading-relaxed text-gray-100">
+      <pre
+        className="flex-1 overflow-auto bg-gray-950 p-4 font-mono leading-relaxed text-gray-100"
+        style={{ fontSize: `${fontSizePx}px` }}
+      >
         <code>{json}</code>
       </pre>
     </div>

@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import {
   inferOutputSchemas,
   type StageOutputSchema,
-} from "@/schema";
-import type { PipelineSchema } from "@/schema";
-import { STAGE_COLORS } from "@/types/pipeline";
+} from "@/Schema";
+import type { PipelineSchema } from "@/Schema";
+import { STAGE_COLORS } from "@/types/Pipeline";
 
 export interface DataSchemaViewProps {
   schema: PipelineSchema;
@@ -112,10 +112,19 @@ function SchemaPanel({
       </header>
 
       {inference.unknown ? (
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-500">
-          {stageType === "CUSTOM"
-            ? "Custom SQL — schema unknown without execution."
-            : "Schema could not be inferred."}
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+          <p className="text-sm text-gray-500">
+            {stageType === "CUSTOM"
+              ? "Custom SQL — output schema is determined at runtime."
+              : "Schema could not be inferred."}
+          </p>
+          {stageType === "CUSTOM" && (
+            <p className="max-w-xs text-xs text-gray-400">
+              This is a UI-only module. No SQL is executed here. The host
+              application is responsible for running the transformation and
+              providing results.
+            </p>
+          )}
         </div>
       ) : inference.columns.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-500">

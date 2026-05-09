@@ -3,8 +3,7 @@ import type {
   StageConfig,
   StageNodeData,
   StageType,
-} from "@/types/pipeline";
-import { MOCK_TABLES } from "@/mocks/tables";
+} from "@/types/Pipeline";
 
 /**
  * Pipeline schema designed for data engineers.
@@ -144,32 +143,9 @@ function collectDatasets(
     const op = stage.operation;
     if (op.stageType !== "LOAD") continue;
     const tableName = op.tableName || stage.output;
-    datasets[tableName] = inferDatasetSchema(tableName);
+    datasets[tableName] = { columns: [] };
   }
   return datasets;
-}
-
-function inferDatasetSchema(tableName: string): DatasetSchema {
-  const mock = MOCK_TABLES[tableName];
-  if (!mock) return { columns: [] };
-  const sample = mock.rows[0] ?? {};
-  return {
-    columns: mock.columns.map((name) => ({
-      name,
-      type: inferColumnType(sample[name]),
-    })),
-  };
-}
-
-function inferColumnType(v: unknown): ColumnType {
-  if (typeof v === "number") return Number.isInteger(v) ? "integer" : "float";
-  if (typeof v === "boolean") return "boolean";
-  if (typeof v === "string") {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return "date";
-    if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return "timestamp";
-    return "string";
-  }
-  return "unknown";
 }
 
 function orderNodesTopologically(

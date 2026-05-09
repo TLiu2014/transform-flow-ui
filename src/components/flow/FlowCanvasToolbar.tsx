@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { AddStageMenu } from "@/components/toolbar/AddStageMenu";
-import type { StageType } from "@/types/pipeline";
+import type { StageType } from "@/types/Pipeline";
 
 const POSITION_OPTIONS: Array<{
   value: Position;

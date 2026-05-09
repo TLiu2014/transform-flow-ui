@@ -5,7 +5,7 @@ import {
   useInternalNode,
   type EdgeProps,
 } from "@xyflow/react";
-import { STAGE_COLORS, type StageNodeData } from "@/types/pipeline";
+import { STAGE_COLORS, type StageNodeData } from "@/types/Pipeline";
 
 const FALLBACK_COLOR = "#9ca3af";
 

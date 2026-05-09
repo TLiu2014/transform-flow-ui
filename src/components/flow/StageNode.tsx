@@ -1,10 +1,11 @@
 import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { Filter, GitMerge, Layers, ArrowDownAZ, Columns3, Database, FunctionSquare, Code2, ExternalLink, Pencil } from "lucide-react";
-import type { StageNodeData, StageType } from "@/types/pipeline";
-import { STAGE_COLORS } from "@/types/pipeline";
-import { cn } from "@/lib/utils";
-import { useStageNodeCallbacks } from "./stage-node-context";
+import type { StageNodeData, StageType } from "@/types/Pipeline";
+import { STAGE_COLORS } from "@/types/Pipeline";
+import { cn } from "@/lib/Utils";
+import { STAGE_EDGE_HANDLE_IDS } from "./StageEdgeHandles";
+import { useStageNodeCallbacks } from "./StageNodeContext";
 
 const STAGE_ICONS: Record<StageType, typeof Filter> = {
   LOAD: Database,
@@ -31,18 +32,79 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
   const Icon = STAGE_ICONS[data.stageType];
   const { onShowOutput, onEdit } = useStageNodeCallbacks();
 
+  const handleCls =
+    "!h-2.5 !w-2.5 !border-2 !border-gray-300 !bg-white transition-colors hover:!border-blue-400 hover:!bg-blue-50";
+
+  const h = STAGE_EDGE_HANDLE_IDS;
+
   return (
     <div
       className={cn(
-        "min-w-[200px] rounded-md border-2 bg-white p-3 shadow-sm transition-shadow",
+        "relative min-w-[200px] rounded-md border-2 bg-white p-3 shadow-sm transition-shadow",
         selected ? "ring-2 ring-blue-400 ring-offset-2" : "hover:shadow-md",
       )}
       style={{ borderColor: color }}
     >
+      {/* One visual dot per side: React Flow still needs separate target + source
+          handles; stacked at the same spot so only one connector shows. */}
       <Handle
+        id={h.topIn}
         type="target"
         position={Position.Top}
-        className="!h-2 !w-2 !border-gray-300 !bg-white"
+        className={`${handleCls} z-[1]`}
+        style={{ left: "50%" }}
+      />
+      <Handle
+        id={h.topOut}
+        type="source"
+        position={Position.Top}
+        className={`${handleCls} z-[2]`}
+        style={{ left: "50%" }}
+      />
+
+      <Handle
+        id={h.bottomIn}
+        type="target"
+        position={Position.Bottom}
+        className={`${handleCls} z-[1]`}
+        style={{ left: "50%" }}
+      />
+      <Handle
+        id={h.bottomOut}
+        type="source"
+        position={Position.Bottom}
+        className={`${handleCls} z-[2]`}
+        style={{ left: "50%" }}
+      />
+
+      <Handle
+        id={h.leftIn}
+        type="target"
+        position={Position.Left}
+        className={`${handleCls} z-[1]`}
+        style={{ top: "50%" }}
+      />
+      <Handle
+        id={h.leftOut}
+        type="source"
+        position={Position.Left}
+        className={`${handleCls} z-[2]`}
+        style={{ top: "50%" }}
+      />
+
+      <Handle
+        id={h.rightIn}
+        type="target"
+        position={Position.Right}
+        className={`${handleCls} z-[1]`}
+        style={{ top: "50%" }}
+      />
+      <Handle
+        id={h.rightOut}
+        type="source"
+        position={Position.Right}
+        className={`${handleCls} z-[2]`}
+        style={{ top: "50%" }}
       />
 
       <div className="flex items-start gap-2">
@@ -115,12 +177,6 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
           )}
         </div>
       </div>
-
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-2 !w-2 !border-gray-300 !bg-white"
-      />
     </div>
   );
 }
