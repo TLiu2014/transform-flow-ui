@@ -14,7 +14,7 @@ export interface JsonViewProps {
 
 const JSON_FONT_MIN_PX = 9;
 const JSON_FONT_MAX_PX = 22;
-const JSON_FONT_DEFAULT_PX = 11;
+const JSON_FONT_DEFAULT_PX = 12;
 
 export function JsonView({ schema }: JsonViewProps) {
   const json = JSON.stringify(schema, null, 2);

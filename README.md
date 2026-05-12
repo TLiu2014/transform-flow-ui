@@ -160,6 +160,7 @@ flowRef.current?.addStage("FILTER");
 | `onChange` | Fires after every meaningful edit. Keep `schema` in sync so the schema viewers stay live. |
 | `configDisplayMode` | `"popover"` *(default)* or `"panel"` (right sidebar). |
 | `confirmBeforeDelete` | Show a confirm dialog before deleting (default `true`). |
+| `readOnly` | Initial mode — `true` starts in view-only, `false` (default) starts in edit. A toggle button on the canvas always lets the user switch. |
 | `onShowOutput` | Called when the user clicks a stage's output-table link. |
 
 **`TransformationFlowHandle` (via `ref`):**

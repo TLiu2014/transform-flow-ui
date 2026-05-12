@@ -27,6 +27,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 
+import { Eye, Pencil } from "lucide-react";
 import { StageConfigUI } from "@/components/config/StageConfigUI";
 import { FlowCanvasToolbar } from "@/components/flow/FlowCanvasToolbar";
 import { deserializePipeline, serializePipeline, type PipelineSchema } from "@/Schema";
@@ -65,6 +66,8 @@ export interface TransformationFlowProps {
    */
   configDisplayMode?: "popover" | "panel";
   confirmBeforeDelete?: boolean;
+  /** When true, the canvas is view-only: no edits, no connections, no deletions. Node dragging is still allowed. */
+  readOnly?: boolean;
 }
 
 const nodeTypes: NodeTypes = { stageNode: StageNode };
@@ -88,6 +91,7 @@ export const TransformationFlow = forwardRef<
     onShowOutput,
     configDisplayMode = "popover",
     confirmBeforeDelete = true,
+    readOnly = false,
   },
   ref,
 ) {
@@ -97,6 +101,12 @@ export const TransformationFlow = forwardRef<
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [toolbarExpanded, setToolbarExpanded] = useState(true);
   const [popoverPosition, setPopoverPosition] = useState<Position>(Position.Right);
+  const [isReadOnly, setIsReadOnly] = useState(readOnly);
+  // Reconnect constraints use refs so StageNode reads synchronously-set values
+  // when useConnection triggers its re-render (zustand fires before React
+  // flushes state, so state would arrive a render too late).
+  const validReconnectNodeIdRef = useRef<string | null>(null);
+  const selfLoopReconnectNodeIdRef = useRef<string | null>(null);
 
   // Refs always hold the latest render values — safe to use in callbacks.
   const nodesRef = useRef(nodes);
@@ -188,6 +198,7 @@ export const TransformationFlow = forwardRef<
 
   const handleConnect = useCallback(
     (connection: Connection) => {
+      if (connection.source === connection.target) return;
       const newEdges = addEdge(
         withDefaultHandles({ ...connection, type: "gradient" } as Edge),
         edgesRef.current,
@@ -198,25 +209,81 @@ export const TransformationFlow = forwardRef<
     [emit],
   );
 
+  const reconnectSucceeded = useRef(false);
+
+  const handleReconnectStart = useCallback(
+    (_: unknown, edge: Edge, handleType: "source" | "target") => {
+      // React Flow's onReconnectStart passes handleType as the type of the
+      // OPPOSITE/FIXED handle, not the one being dragged. So:
+      // - handleType === 'target' → dragged side is source, fixed side is target
+      // - handleType === 'source' → dragged side is target, fixed side is source
+      // validRef = the dragged side's node (in view-only, the only valid target).
+      // selfLoopRef = the fixed side's node (connecting dragged side here = self-loop).
+      reconnectSucceeded.current = false;
+      const draggedNodeId = handleType === "target" ? edge.source : edge.target;
+      const fixedNodeId = handleType === "target" ? edge.target : edge.source;
+      validReconnectNodeIdRef.current = isReadOnly ? draggedNodeId : null;
+      selfLoopReconnectNodeIdRef.current = fixedNodeId;
+    },
+    [isReadOnly],
+  );
+
+  const isValidConnection = useCallback(
+    (connection: Connection | Edge): boolean => {
+      // During reconnect selfLoopReconnectNodeIdRef is non-null. React Flow
+      // passes {source: drag-origin, target: hovered} so same-node handle
+      // changes look like self-loops — return true and let StageNode's
+      // reconnectInvalid (from refs) drive the shadow instead.
+      if (selfLoopReconnectNodeIdRef.current != null) return true;
+      // New connection drag: only reject self-loops.
+      return connection.source !== connection.target;
+    },
+    [],
+  );
+
   const handleReconnect = useCallback(
     (oldEdge: Edge, newConnection: Connection) => {
+      // Never allow self-loops.
+      if (newConnection.source === newConnection.target) return;
+      // In read-only mode only allow changing the handle side on the same node.
+      if (
+        isReadOnly &&
+        (newConnection.source !== oldEdge.source ||
+          newConnection.target !== oldEdge.target)
+      ) {
+        return;
+      }
+      reconnectSucceeded.current = true;
       const newEdges = reconnectEdge(oldEdge, newConnection, edgesRef.current);
       setEdges(newEdges);
       emit(nodesRef.current, newEdges);
     },
-    [emit],
+    [emit, isReadOnly],
   );
+
+  const handleReconnectEnd = useCallback((_: unknown, edge: Edge) => {
+    if (!reconnectSucceeded.current) {
+      // Drag dropped to nothing or rejected — restore the edge if React Flow
+      // removed it via onEdgesChange.
+      setEdges((prev) =>
+        prev.some((e) => e.id === edge.id) ? prev : [...prev, edge],
+      );
+    }
+    reconnectSucceeded.current = false;
+    validReconnectNodeIdRef.current = null;
+    selfLoopReconnectNodeIdRef.current = null;
+  }, []);
 
   // ── Node interaction ─────────────────────────────────────────────────────
 
   const handleNodeClick = (node: Node<StageNodeData>) => {
     setSelectedNodeId(node.id);
-    if (configDisplayMode === "panel") setEditingNodeId(node.id);
+    if (!isReadOnly && configDisplayMode === "panel") setEditingNodeId(node.id);
   };
 
   const handleNodeDoubleClick = (node: Node<StageNodeData>) => {
     setSelectedNodeId(node.id);
-    setEditingNodeId(node.id);
+    if (!isReadOnly) setEditingNodeId(node.id);
   };
 
   const handlePaneClick = () => {
@@ -302,9 +369,9 @@ export const TransformationFlow = forwardRef<
   );
 
   const callbacks = useMemo<StageNodeCallbacks>(
-    () => ({ onShowOutput, onEdit: handleEditNode }),
+    () => ({ onShowOutput, onEdit: isReadOnly ? undefined : handleEditNode, readOnly: isReadOnly, validReconnectNodeIdRef, selfLoopReconnectNodeIdRef }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onShowOutput],
+    [onShowOutput, isReadOnly],
   );
 
   return (
@@ -312,20 +379,51 @@ export const TransformationFlow = forwardRef<
       <NodeToolbarPositionProvider value={popoverPosition}>
         <div className="flex h-full min-h-[480px]">
           <div className="relative min-w-0 flex-1">
-            <FlowCanvasToolbar
-              expanded={toolbarExpanded}
-              onExpandedChange={setToolbarExpanded}
-              editPanelPosition={popoverPosition}
-              onEditPanelPositionChange={setPopoverPosition}
-              onAddStage={addStage}
-            />
+            <div className="pointer-events-none absolute left-2 top-2 z-20">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReadOnly((v) => !v);
+                  setEditingNodeId(null);
+                }}
+                title={isReadOnly ? "Switch to edit mode" : "Switch to view-only mode"}
+                aria-label={isReadOnly ? "Switch to edit mode" : "Switch to view-only mode"}
+                className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/95 px-3 text-xs font-medium text-gray-700 shadow-md backdrop-blur hover:bg-gray-50"
+              >
+                {isReadOnly ? (
+                  <>
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-3.5 w-3.5" />
+                    View only
+                  </>
+                )}
+              </button>
+            </div>
+            {!isReadOnly && (
+              <div className="pointer-events-none absolute left-2 top-12 z-20 flex max-w-[min(100%-1rem,18rem)] flex-col gap-1">
+                <FlowCanvasToolbar
+                  expanded={toolbarExpanded}
+                  onExpandedChange={setToolbarExpanded}
+                  editPanelPosition={popoverPosition}
+                  onEditPanelPositionChange={setPopoverPosition}
+                  onAddStage={addStage}
+                />
+              </div>
+            )}
             <ReactFlow
               nodes={decoratedNodes}
               edges={edges}
               onNodesChange={handleNodesChange}
               onEdgesChange={handleEdgesChange}
-              onConnect={handleConnect}
+              onConnect={isReadOnly ? undefined : handleConnect}
+              isValidConnection={isValidConnection}
+              onReconnectStart={handleReconnectStart}
               onReconnect={handleReconnect}
+              onReconnectEnd={handleReconnectEnd}
               onNodeClick={(_, node) => handleNodeClick(node as Node<StageNodeData>)}
               onNodeDoubleClick={(_, node) => handleNodeDoubleClick(node as Node<StageNodeData>)}
               onNodeDragStop={() => emit(nodesRef.current, edgesRef.current)}
@@ -334,6 +432,7 @@ export const TransformationFlow = forwardRef<
               edgeTypes={edgeTypes}
               defaultEdgeOptions={{ type: "gradient" }}
               connectionMode={ConnectionMode.Loose}
+              deleteKeyCode={isReadOnly ? null : "Delete"}
               onInit={(instance) =>
                 requestAnimationFrame(() => instance.fitView({ padding: 0.1 }))
               }
@@ -351,7 +450,7 @@ export const TransformationFlow = forwardRef<
                 }}
                 className="!bg-white"
               />
-              {configDisplayMode === "popover" && editingNode && (
+              {!isReadOnly && configDisplayMode === "popover" && editingNode && (
                 <PopoverStageEditor
                   node={editingNode}
                   onUpdate={handleUpdateNode}
@@ -363,7 +462,7 @@ export const TransformationFlow = forwardRef<
             </ReactFlow>
           </div>
 
-          {configDisplayMode === "panel" && (
+          {!isReadOnly && configDisplayMode === "panel" && (
             <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
               <StageConfigUI
                 node={editingNode}

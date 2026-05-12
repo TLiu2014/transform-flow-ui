@@ -8,6 +8,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import { STAGE_COLORS, type StageNodeData } from "@/types/Pipeline";
+import { useStageNodeCallbacks } from "./StageNodeContext";
 
 const FALLBACK_COLOR = "#9ca3af";
 
@@ -24,6 +25,7 @@ function GradientEdgeImpl({
   selected,
 }: EdgeProps) {
   const { deleteElements } = useReactFlow();
+  const { readOnly } = useStageNodeCallbacks();
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
@@ -73,7 +75,7 @@ function GradientEdgeImpl({
         markerEnd={`url(#${markerId})`}
         style={{ stroke: `url(#${gradientId})`, strokeWidth: 2.5 }}
       />
-      {selected && (
+      {selected && !readOnly && (
         <EdgeLabelRenderer>
           <button
             type="button"

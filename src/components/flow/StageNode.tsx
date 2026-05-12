@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
 import { Filter, GitMerge, Layers, ArrowDownAZ, Columns3, Database, FunctionSquare, Code2, ExternalLink, Pencil } from "lucide-react";
 import type { StageNodeData, StageType } from "@/types/Pipeline";
 import { STAGE_COLORS } from "@/types/Pipeline";
@@ -30,10 +30,58 @@ type StageNodeType = Node<StageNodeData, "stageNode">;
 function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
   const color = STAGE_COLORS[data.stageType];
   const Icon = STAGE_ICONS[data.stageType];
-  const { onShowOutput, onEdit } = useStageNodeCallbacks();
+  const { onShowOutput, onEdit, readOnly, validReconnectNodeIdRef, selfLoopReconnectNodeIdRef } = useStageNodeCallbacks();
+  const activeConnection = useConnection((connection) => ({
+    inProgress: connection.inProgress,
+    isValid: connection.isValid,
+    toNodeId: connection.toHandle?.nodeId ?? null,
+    toHandleId: connection.toHandle?.id ?? null,
+  }));
+
+  // Read refs synchronously — they are written in handleReconnectStart before
+  // zustand fires useConnection, so these values are always current here.
+  const reconnectInvalid =
+    (validReconnectNodeIdRef?.current != null && id !== validReconnectNodeIdRef.current) ||
+    (selfLoopReconnectNodeIdRef?.current != null && id === selfLoopReconnectNodeIdRef.current);
+  const reconnectInProgress =
+    validReconnectNodeIdRef?.current != null ||
+    selfLoopReconnectNodeIdRef?.current != null;
 
   const handleCls =
     "!h-2.5 !w-2.5 !border-2 !border-gray-300 !bg-white transition-colors hover:!border-blue-400 hover:!bg-blue-50";
+
+  const getHandleSide = (handleId: string) => handleId.split("-")[0];
+
+  const approachingSide = activeConnection.toHandleId
+    ? getHandleSide(activeConnection.toHandleId)
+    : null;
+
+  const getHandleClassName = (handleId: string) => {
+    const isApproaching =
+      activeConnection.inProgress &&
+      activeConnection.toNodeId === id &&
+      approachingSide === getHandleSide(handleId);
+
+    if (!isApproaching) {
+      return handleCls;
+    }
+
+    if (reconnectInProgress) {
+      return `${handleCls} tfu-handle-approaching ${
+        reconnectInvalid ? "tfu-handle-invalid" : "tfu-handle-valid"
+      }`;
+    }
+
+    if (activeConnection.isValid == null) {
+      return handleCls;
+    }
+
+    return `${handleCls} tfu-handle-approaching ${
+      reconnectInvalid || activeConnection.isValid === false
+        ? "tfu-handle-invalid"
+        : "tfu-handle-valid"
+    }`;
+  };
 
   const h = STAGE_EDGE_HANDLE_IDS;
 
@@ -51,14 +99,14 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
         id={h.topIn}
         type="target"
         position={Position.Top}
-        className={`${handleCls} z-[1]`}
+        className={`${getHandleClassName(h.topIn)} z-[1]`}
         style={{ left: "50%" }}
       />
       <Handle
         id={h.topOut}
         type="source"
         position={Position.Top}
-        className={`${handleCls} z-[2]`}
+        className={`${getHandleClassName(h.topOut)} z-[2]`}
         style={{ left: "50%" }}
       />
 
@@ -66,14 +114,14 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
         id={h.bottomIn}
         type="target"
         position={Position.Bottom}
-        className={`${handleCls} z-[1]`}
+        className={`${getHandleClassName(h.bottomIn)} z-[1]`}
         style={{ left: "50%" }}
       />
       <Handle
         id={h.bottomOut}
         type="source"
         position={Position.Bottom}
-        className={`${handleCls} z-[2]`}
+        className={`${getHandleClassName(h.bottomOut)} z-[2]`}
         style={{ left: "50%" }}
       />
 
@@ -81,14 +129,14 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
         id={h.leftIn}
         type="target"
         position={Position.Left}
-        className={`${handleCls} z-[1]`}
+        className={`${getHandleClassName(h.leftIn)} z-[1]`}
         style={{ top: "50%" }}
       />
       <Handle
         id={h.leftOut}
         type="source"
         position={Position.Left}
-        className={`${handleCls} z-[2]`}
+        className={`${getHandleClassName(h.leftOut)} z-[2]`}
         style={{ top: "50%" }}
       />
 
@@ -96,14 +144,14 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
         id={h.rightIn}
         type="target"
         position={Position.Right}
-        className={`${handleCls} z-[1]`}
+        className={`${getHandleClassName(h.rightIn)} z-[1]`}
         style={{ top: "50%" }}
       />
       <Handle
         id={h.rightOut}
         type="source"
         position={Position.Right}
-        className={`${handleCls} z-[2]`}
+        className={`${getHandleClassName(h.rightOut)} z-[2]`}
         style={{ top: "50%" }}
       />
 
@@ -126,7 +174,7 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
               <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
                 #{data.stageIndex}
               </span>
-              {onEdit && (
+              {onEdit && !readOnly && (
                 <button
                   type="button"
                   onClick={(e) => {

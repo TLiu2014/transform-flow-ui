@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { type MutableRefObject, createContext, useContext } from "react";
 
 export interface StageNodeCallbacks {
   /**
@@ -13,6 +13,19 @@ export interface StageNodeCallbacks {
    * when single-click selection is suppressed (e.g. popover edit mode).
    */
   onEdit?: (stageId: string) => void;
+  /** When true, editing/deleting controls are hidden throughout the canvas. */
+  readOnly?: boolean;
+  /**
+   * Ref to the only node whose handles are valid during a view-only reconnect
+   * drag. Null outside a drag or in edit mode. Passed as a ref so StageNode
+   * always reads the synchronously-set value from handleReconnectStart.
+   */
+  validReconnectNodeIdRef?: MutableRefObject<string | null>;
+  /**
+   * Ref to the node that would create a self-loop during any reconnect drag —
+   * always an invalid target. Null outside an active drag.
+   */
+  selfLoopReconnectNodeIdRef?: MutableRefObject<string | null>;
 }
 
 export const StageNodeContext = createContext<StageNodeCallbacks>({});

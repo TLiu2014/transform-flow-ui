@@ -39,7 +39,7 @@ export function FlowCanvasToolbar({
   onAddStage,
 }: FlowCanvasToolbarProps) {
   return (
-    <div className="pointer-events-none absolute left-2 top-2 z-20 flex max-w-[min(100%-1rem,18rem)] flex-col gap-1">
+    <>
       {!expanded ? (
         <button
           type="button"
@@ -105,6 +105,6 @@ export function FlowCanvasToolbar({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

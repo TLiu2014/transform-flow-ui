@@ -15,3 +15,21 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* Handle validity feedback during connection / reconnect drags.
+   StageNode marks exactly one approached handle with:
+   - .tfu-handle-approaching
+   - .tfu-handle-valid or .tfu-handle-invalid
+   This avoids stacked source/target handles on the same dot fighting over
+   the shadow color while preserving the existing connection logic. */
+.react-flow__handle.tfu-handle-approaching.tfu-handle-valid {
+  border-color: #22c55e !important;
+  background-color: #dcfce7 !important;
+  box-shadow: 0 0 0 2px #bbf7d0;
+}
+.react-flow__handle.tfu-handle-approaching.tfu-handle-invalid {
+  border-color: #ef4444 !important;
+  background-color: #fee2e2 !important;
+  box-shadow: 0 0 0 2px #fecaca;
+  cursor: not-allowed !important;
+}
