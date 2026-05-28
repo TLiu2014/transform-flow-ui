@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Handle, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
 import { Filter, GitMerge, Layers, ArrowDownAZ, Columns3, Database, FunctionSquare, Code2, ExternalLink, Pencil } from "lucide-react";
 import type { StageNodeData, StageType } from "@/types/Pipeline";
-import { STAGE_COLORS } from "@/types/Pipeline";
+import { getStageColor } from "@/types/Pipeline";
 import { cn } from "@/lib/Utils";
 import { STAGE_EDGE_HANDLE_IDS } from "./StageEdgeHandles";
 import { useStageNodeCallbacks } from "./StageNodeContext";
@@ -28,7 +28,7 @@ const EXEC_BADGE: Record<NonNullable<StageNodeData["executionState"]>, string> =
 type StageNodeType = Node<StageNodeData, "stageNode">;
 
 function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
-  const color = STAGE_COLORS[data.stageType];
+  const color = getStageColor(data);
   const Icon = STAGE_ICONS[data.stageType];
   const { onShowOutput, onEdit, readOnly, validReconnectNodeIdRef, selfLoopReconnectNodeIdRef } = useStageNodeCallbacks();
   const activeConnection = useConnection((connection) => ({
@@ -165,10 +165,13 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <span
-              className="text-xs font-semibold uppercase tracking-wide"
+              className={cn(
+                "text-xs font-semibold tracking-wide",
+                !data.displayType && "uppercase",
+              )}
               style={{ color }}
             >
-              {data.stageType}
+              {data.displayType || data.stageType}
             </span>
             <div className="flex items-center gap-1">
               <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">

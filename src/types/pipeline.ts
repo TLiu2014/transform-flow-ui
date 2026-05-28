@@ -96,6 +96,10 @@ export interface StageNodeData {
   outputTableName?: string;
   executionState?: ExecutionState;
   config: StageConfig;
+  /** Overrides the default per-stage-type color when set. */
+  color?: string;
+  /** Overrides the type label shown on the node and in the config header. */
+  displayType?: string;
   [key: string]: unknown;
 }
 
@@ -109,6 +113,33 @@ export const STAGE_COLORS: Record<StageType, string> = {
   SELECT: "#14b8a6",
   CUSTOM: "#6b7280",
 };
+
+export interface TagColor {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export const TAG_COLORS: TagColor[] = [
+  { key: "gray", label: "Gray", value: "#6b7280" },
+  { key: "red", label: "Red", value: "#ef4444" },
+  { key: "orange", label: "Orange", value: "#f97316" },
+  { key: "amber", label: "Amber", value: "#f59e0b" },
+  { key: "yellow", label: "Yellow", value: "#eab308" },
+  { key: "lime", label: "Lime", value: "#84cc16" },
+  { key: "green", label: "Green", value: "#22c55e" },
+  { key: "teal", label: "Teal", value: "#14b8a6" },
+  { key: "cyan", label: "Cyan", value: "#06b6d4" },
+  { key: "blue", label: "Blue", value: "#3b82f6" },
+  { key: "indigo", label: "Indigo", value: "#6366f1" },
+  { key: "purple", label: "Purple", value: "#a855f7" },
+  { key: "pink", label: "Pink", value: "#ec4899" },
+  { key: "rose", label: "Rose", value: "#f43f5e" },
+];
+
+export function getStageColor(data: Pick<StageNodeData, "stageType" | "color">): string {
+  return data.color ?? STAGE_COLORS[data.stageType];
+}
 
 export const STAGE_LABELS: Record<StageType, string> = {
   LOAD: "Load",

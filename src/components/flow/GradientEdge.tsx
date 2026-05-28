@@ -7,7 +7,7 @@ import {
   useReactFlow,
   type EdgeProps,
 } from "@xyflow/react";
-import { STAGE_COLORS, type StageNodeData } from "@/types/Pipeline";
+import { getStageColor, type StageNodeData } from "@/types/Pipeline";
 import { useStageNodeCallbacks } from "./StageNodeContext";
 
 const FALLBACK_COLOR = "#9ca3af";
@@ -97,9 +97,9 @@ function GradientEdgeImpl({
 
 function colorFor(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
-  const stageType = (data as Partial<StageNodeData>).stageType;
-  if (!stageType) return null;
-  return STAGE_COLORS[stageType] ?? null;
+  const d = data as Partial<StageNodeData>;
+  if (!d.stageType) return null;
+  return getStageColor({ stageType: d.stageType, color: d.color });
 }
 
 export const GradientEdge = memo(GradientEdgeImpl);

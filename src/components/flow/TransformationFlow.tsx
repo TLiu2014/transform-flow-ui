@@ -31,7 +31,7 @@ import { Eye, Pencil } from "lucide-react";
 import { StageConfigUI } from "@/components/config/StageConfigUI";
 import { FlowCanvasToolbar } from "@/components/flow/FlowCanvasToolbar";
 import { deserializePipeline, serializePipeline, type PipelineSchema } from "@/Schema";
-import { STAGE_COLORS, STAGE_LABELS, defaultConfigFor, type StageNodeData, type StageType } from "@/types/Pipeline";
+import { STAGE_LABELS, defaultConfigFor, getStageColor, type StageNodeData, type StageType } from "@/types/Pipeline";
 import {
   DEFAULT_EDGE_SOURCE_HANDLE_ID,
   DEFAULT_EDGE_TARGET_HANDLE_ID,
@@ -446,7 +446,7 @@ export const TransformationFlow = forwardRef<
                 zoomable
                 nodeColor={(n) => {
                   const data = n.data as StageNodeData | undefined;
-                  return data ? STAGE_COLORS[data.stageType] : "#9ca3af";
+                  return data ? getStageColor(data) : "#9ca3af";
                 }}
                 className="!bg-white"
               />

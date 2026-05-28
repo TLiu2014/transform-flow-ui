@@ -47,7 +47,8 @@ export type {
   ExecutionState,
 } from "./types/Pipeline";
 
-export { STAGE_COLORS, STAGE_LABELS, defaultConfigFor } from "./types/Pipeline";
+export { STAGE_COLORS, STAGE_LABELS, TAG_COLORS, getStageColor, defaultConfigFor } from "./types/Pipeline";
+export type { TagColor } from "./types/Pipeline";
 
 // Schema
 export type {

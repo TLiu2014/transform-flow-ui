@@ -4,7 +4,7 @@ import {
   type StageOutputSchema,
 } from "@/Schema";
 import type { PipelineSchema } from "@/Schema";
-import { STAGE_COLORS } from "@/types/Pipeline";
+import { getStageColor } from "@/types/Pipeline";
 
 export interface DataSchemaViewProps {
   schema: PipelineSchema;
@@ -95,7 +95,7 @@ export function DataSchemaView({
             >
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: STAGE_COLORS[s.type] }}
+                style={{ backgroundColor: getStageColor({ stageType: s.type, color: s.color }) }}
               />
               <span className="font-mono text-xs">{s.output}</span>
             </button>

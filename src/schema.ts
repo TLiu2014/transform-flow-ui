@@ -48,6 +48,10 @@ export interface SerializedStage {
   inputs: string[];
   output: string;
   operation: StageConfig;
+  /** User-chosen color override (hex). Omitted to use the stage-type default. */
+  color?: string;
+  /** User-chosen label override for the type badge on the node. */
+  displayType?: string;
 }
 
 export interface PipelineLayout {
@@ -113,6 +117,8 @@ function toSerializedStage(
     inputs,
     output: node.data.outputTableName ?? fallbackOutput,
     operation: node.data.config,
+    ...(node.data.color ? { color: node.data.color } : {}),
+    ...(node.data.displayType ? { displayType: node.data.displayType } : {}),
   };
 }
 
@@ -217,6 +223,8 @@ export function deserializePipeline(schema: PipelineSchema): DeserializedPipelin
       stageIndex: i + 1,
       outputTableName: stage.output,
       config: stage.operation,
+      ...(stage.color ? { color: stage.color } : {}),
+      ...(stage.displayType ? { displayType: stage.displayType } : {}),
     },
   }));
 

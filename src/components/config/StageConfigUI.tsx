@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,7 +25,9 @@ import {
   type SortDirection,
   STAGE_COLORS,
   STAGE_LABELS,
+  TAG_COLORS,
 } from "@/types/Pipeline";
+import { cn } from "@/lib/Utils";
 
 interface StageConfigUIProps {
   node: { id: string; data: StageNodeData } | null;
@@ -89,20 +91,57 @@ function StageConfigForm({
   const [outputTableName, setOutputTableName] = useState(
     node.data.outputTableName ?? "",
   );
+  const [color, setColor] = useState<string | undefined>(node.data.color);
+  const [displayTypeInput, setDisplayTypeInput] = useState(node.data.displayType ?? "");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Color is live-previewed on the canvas: each pick calls onUpdate immediately
+  // so the node re-paints. On Save we keep it; on Cancel/unmount we revert to
+  // the color the node had when this form opened.
+  const initialColorRef = useRef(node.data.color);
+  const savedRef = useRef(false);
+  const nodeIdRef = useRef(node.id);
+  const onUpdateRef = useRef(onUpdate);
+  nodeIdRef.current = node.id;
+  onUpdateRef.current = onUpdate;
 
   useEffect(() => {
     setLabel(node.data.label);
     setConfig(node.data.config);
     setOutputTableName(node.data.outputTableName ?? "");
-  }, [node.id, node.data.label, node.data.config, node.data.outputTableName]);
+    setColor(node.data.color);
+    setDisplayTypeInput(node.data.displayType ?? "");
+    initialColorRef.current = node.data.color;
+    savedRef.current = false;
+    // Intentionally key only on node.id: live-preview updates to node.data.color
+    // would otherwise overwrite the baseline we need for revert.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id]);
 
-  const color = STAGE_COLORS[node.data.stageType];
+  // Revert preview color on unmount unless a save (or delete) committed it.
+  useEffect(() => {
+    return () => {
+      if (savedRef.current) return;
+      onUpdateRef.current(nodeIdRef.current, { color: initialColorRef.current });
+    };
+  }, []);
+
+  const previewColor = (next: string | undefined) => {
+    setColor(next);
+    onUpdate(node.id, { color: next });
+  };
+
+  const defaultColor = STAGE_COLORS[node.data.stageType];
+  const effectiveColor = color ?? defaultColor;
+  const displayType = displayTypeInput.trim();
 
   const isDirty = useMemo(() => {
     if (label !== node.data.label) return true;
     const cleanOutput = outputTableName || undefined;
     if (cleanOutput !== node.data.outputTableName) return true;
+    if (color !== node.data.color) return true;
+    const cleanDisplayType = displayType || undefined;
+    if (cleanDisplayType !== node.data.displayType) return true;
     // Config is a small POJO union — JSON-string compare is fine.
     if (JSON.stringify(config) !== JSON.stringify(node.data.config)) return true;
     return false;
@@ -110,17 +149,24 @@ function StageConfigForm({
     label,
     outputTableName,
     config,
+    color,
+    displayType,
     node.data.label,
     node.data.outputTableName,
     node.data.config,
+    node.data.color,
+    node.data.displayType,
   ]);
 
   const handleSave = () => {
+    savedRef.current = true;
     if (isDirty) {
       onUpdate(node.id, {
         label,
         config,
         outputTableName: outputTableName || undefined,
+        color,
+        displayType: displayType || undefined,
       });
     }
     onCancel?.();
@@ -135,19 +181,71 @@ function StageConfigForm({
   };
 
   const confirmDelete = () => {
+    savedRef.current = true;
     setDeleteDialogOpen(false);
     onDelete(node.id);
   };
 
+  // Keep latest handlers reachable from the document-level keydown listener
+  // without re-binding on every render.
+  const handleSaveRef = useRef(handleSave);
+  const onCancelRef = useRef(onCancel);
+  const deleteDialogOpenRef = useRef(deleteDialogOpen);
+  handleSaveRef.current = handleSave;
+  onCancelRef.current = onCancel;
+  deleteDialogOpenRef.current = deleteDialogOpen;
+
+  // Document-level so shortcuts fire even when focus lands on body (e.g. after
+  // clicking a color swatch in browsers that don't focus buttons on click).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (deleteDialogOpenRef.current) return;
+      const t = e.target as HTMLElement | null;
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancelRef.current?.();
+        return;
+      }
+
+      if (
+        e.key === "Enter" &&
+        !e.shiftKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
+        if (e.isComposing) return;
+        // Let the focused element keep its own Enter behavior in these cases:
+        // - textarea (newline)
+        // - Radix Select trigger / listbox items (open/select)
+        // - any button opting out via data attribute (Cancel, Delete)
+        if (t?.tagName === "TEXTAREA") return;
+        const role = t?.getAttribute("role");
+        if (role === "combobox" || role === "listbox" || role === "option") return;
+        if (t?.closest("[data-tfu-no-enter-save]")) return;
+        e.preventDefault();
+        handleSaveRef.current();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   return (
-    <div className="grid h-full min-h-0 w-full flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden">
+    <div
+      className="grid h-full min-h-0 w-full flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
+    >
       <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div className="flex items-center gap-2">
           <span
-            className="rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white"
-            style={{ backgroundColor: color }}
+            className={cn(
+              "rounded px-2 py-0.5 text-xs font-semibold tracking-wide text-white",
+              !displayType && "uppercase",
+            )}
+            style={{ backgroundColor: effectiveColor }}
           >
-            {STAGE_LABELS[node.data.stageType]}
+            {displayType || STAGE_LABELS[node.data.stageType]}
           </span>
           <span className="text-xs text-gray-500">#{node.data.stageIndex}</span>
         </div>
@@ -156,6 +254,7 @@ function StageConfigForm({
           size="icon"
           onClick={requestDelete}
           aria-label="Delete stage"
+          data-tfu-no-enter-save
         >
           <Trash2 className="h-4 w-4 text-gray-500" />
         </Button>
@@ -171,11 +270,27 @@ function StageConfigForm({
             />
           </Field>
 
+          <Field label="Display type name">
+            <Input
+              value={displayTypeInput}
+              onChange={(e) => setDisplayTypeInput(e.target.value)}
+              placeholder={`default: ${node.data.stageType}`}
+            />
+          </Field>
+
           <Field label="Output table name">
             <Input
               value={outputTableName}
               onChange={(e) => setOutputTableName(e.target.value)}
               placeholder="auto-generated if blank"
+            />
+          </Field>
+
+          <Field label="Color">
+            <ColorPicker
+              value={color}
+              defaultColor={defaultColor}
+              onChange={previewColor}
             />
           </Field>
 
@@ -204,6 +319,7 @@ function StageConfigForm({
                 variant="outline"
                 size="sm"
                 onClick={onCancel}
+                data-tfu-no-enter-save
                 className="w-full justify-center"
               >
                 Cancel
@@ -279,6 +395,62 @@ function Field({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
+    </div>
+  );
+}
+
+interface ColorPickerProps {
+  value: string | undefined;
+  defaultColor: string;
+  onChange: (next: string | undefined) => void;
+}
+
+function ColorPicker({ value, defaultColor, onChange }: ColorPickerProps) {
+  const isDefault = value === undefined;
+  const normalize = (v: string) => v.toLowerCase();
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          aria-label="Use stage-type default color"
+          aria-pressed={isDefault}
+          title="Default (by stage type)"
+          onClick={() => onChange(undefined)}
+          className={cn(
+            "relative inline-flex h-6 w-6 items-center justify-center rounded-full border bg-white text-[10px] font-semibold text-gray-500 transition",
+            isDefault
+              ? "border-gray-900 ring-2 ring-offset-1 ring-gray-300"
+              : "border-gray-300 hover:border-gray-500",
+          )}
+          style={{ color: defaultColor }}
+        >
+          <span aria-hidden>A</span>
+        </button>
+        {TAG_COLORS.map((c) => {
+          const selected = !isDefault && normalize(value!) === normalize(c.value);
+          return (
+            <button
+              key={c.key}
+              type="button"
+              aria-label={c.label}
+              aria-pressed={selected}
+              title={c.label}
+              onClick={() => onChange(c.value)}
+              className={cn(
+                "h-6 w-6 rounded-full border transition",
+                selected
+                  ? "border-gray-900 ring-2 ring-offset-1 ring-gray-300"
+                  : "border-black/10 hover:scale-110",
+              )}
+              style={{ backgroundColor: c.value }}
+            />
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-gray-400">
+        {isDefault ? "Using default color for this stage type." : "Custom color override."}
+      </p>
     </div>
   );
 }
