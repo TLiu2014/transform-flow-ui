@@ -3,6 +3,7 @@ import {
   NodeToolbar,
   Position,
   useReactFlow,
+  useStore,
   type Node,
 } from "@xyflow/react";
 
@@ -34,7 +35,12 @@ export function PopoverStageEditor({
 }: PopoverStageEditorProps) {
   const position = useNodeToolbarPosition();
   const reactFlow = useReactFlow();
+  const canvasHeight = useStore((s) => s.height);
   const nodeId = node.id;
+  // Cap popover height to the canvas pane so it never exceeds the visible area.
+  // Subtract 2× offset for breathing room top + bottom.
+  const popoverMaxHeight =
+    canvasHeight > 0 ? Math.max(120, canvasHeight - POPOVER_OFFSET * 2) : null;
 
   // Pan the canvas so the node + popover are both in view when the editor opens.
   useEffect(() => {
@@ -77,8 +83,8 @@ export function PopoverStageEditor({
       className="!pointer-events-auto !flex !flex-col [&>*]:min-h-0"
     >
       <div
-        className="box-border flex min-h-0 w-[340px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
-        style={{ maxHeight: "85vh" }}
+        className="nowheel box-border grid w-[340px] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+        style={{ maxHeight: popoverMaxHeight != null ? `${popoverMaxHeight}px` : "85vh" }}
       >
         <StageConfigUI
           node={node}
