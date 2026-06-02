@@ -1,0 +1,73 @@
+{
+  "datasets": {
+    "orders": {
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer"
+        },
+        {
+          "name": "status_code",
+          "type": "integer"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "orders",
+        "source": "orders.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "orders_labeled",
+      "type": "LOOKUP",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "orders"
+      ],
+      "output": "orders_labeled",
+      "operation": {
+        "stageType": "LOOKUP",
+        "table": "orders",
+        "targetColumn": "status_code",
+        "outputType": "NEW_COLUMN",
+        "newColumnName": "status",
+        "dictionary": [
+          {
+            "source": "1",
+            "target": "Active"
+          },
+          {
+            "source": "2",
+            "target": "Pending"
+          },
+          {
+            "source": "3",
+            "target": "Shipped"
+          },
+          {
+            "source": "4",
+            "target": "Delivered"
+          }
+        ],
+        "fallbackValue": "Unknown"
+      }
+    }
+  ]
+}

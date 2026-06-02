@@ -1,0 +1,66 @@
+{
+  "datasets": {
+    "signups": {
+      "columns": [
+        {
+          "name": "email",
+          "type": "string"
+        },
+        {
+          "name": "age",
+          "type": "integer"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_signups",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "signups",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "signups",
+        "source": "signups.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "validate_signups",
+      "type": "VALIDATE",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "signups"
+      ],
+      "output": "clean_signups",
+      "operation": {
+        "stageType": "VALIDATE",
+        "table": "signups",
+        "combinator": "AND",
+        "rules": [
+          {
+            "column": "age",
+            "operator": ">",
+            "value": "0"
+          },
+          {
+            "column": "email",
+            "operator": "LIKE",
+            "value": "%@%"
+          }
+        ],
+        "passOutput": "clean_signups",
+        "failOutput": "bad_signups"
+      }
+    }
+  ]
+}

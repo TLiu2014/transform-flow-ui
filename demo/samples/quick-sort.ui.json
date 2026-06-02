@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-sort",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "SORT: order rows by one or more columns."
+  },
+  "datasets": {
+    "orders": {
+      "columns": [
+        { "name": "order_id", "type": "integer" },
+        { "name": "customer_id", "type": "integer" },
+        { "name": "amount", "type": "float" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": { "stageType": "LOAD", "tableName": "orders", "source": "orders.csv" }
+    },
+    {
+      "id": "s1",
+      "name": "orders_by_amount",
+      "type": "SORT",
+      "depends_on": ["l1"],
+      "inputs": ["orders"],
+      "output": "orders_by_amount",
+      "operation": {
+        "stageType": "SORT",
+        "table": "orders",
+        "orderBy": [{ "column": "amount", "direction": "DESC" }]
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "l1", "position": { "x": 160, "y": 60 } },
+      { "id": "s1", "position": { "x": 160, "y": 220 } }
+    ],
+    "edges": [{ "id": "e1", "source": "l1", "target": "s1" }]
+  }
+}

@@ -1,0 +1,87 @@
+[
+  {
+    "id": "revenue-by-country",
+    "label": "Revenue by country",
+    "description": "Linear: load × 2 → join → filter → group"
+  },
+  {
+    "id": "revenue-and-status",
+    "label": "Revenue + status",
+    "description": "Branched: same join, two parallel groupings"
+  },
+  {
+    "id": "quick-load",
+    "label": "Quick: Load",
+    "description": "LOAD a single table from a source"
+  },
+  {
+    "id": "quick-filter",
+    "label": "Quick: Filter",
+    "description": "Filter rows by a predicate"
+  },
+  {
+    "id": "quick-join",
+    "label": "Quick: Join",
+    "description": "Inner-join two tables on a key"
+  },
+  {
+    "id": "quick-union",
+    "label": "Quick: Union",
+    "description": "Stack two tables with matching columns"
+  },
+  {
+    "id": "quick-group",
+    "label": "Quick: Group by",
+    "description": "Bucket rows and aggregate"
+  },
+  {
+    "id": "quick-sort",
+    "label": "Quick: Sort",
+    "description": "Order rows by a column"
+  },
+  {
+    "id": "quick-select",
+    "label": "Quick: Select",
+    "description": "Project a subset of columns"
+  },
+  {
+    "id": "quick-pivot",
+    "label": "Quick: Pivot",
+    "description": "Wide pivot: column values become columns"
+  },
+  {
+    "id": "quick-unpivot",
+    "label": "Quick: Unpivot",
+    "description": "Melt columns into name/value rows"
+  },
+  {
+    "id": "quick-dedupe",
+    "label": "Quick: Deduplicate",
+    "description": "Collapse duplicate rows by key"
+  },
+  {
+    "id": "quick-validate",
+    "label": "Quick: Validate",
+    "description": "Split rows into pass/fail by rules"
+  },
+  {
+    "id": "quick-lookup",
+    "label": "Quick: Lookup",
+    "description": "Replace coded values via a static mapping"
+  },
+  {
+    "id": "quick-formula",
+    "label": "Quick: Formula",
+    "description": "Per-row expressions for new columns"
+  },
+  {
+    "id": "quick-window",
+    "label": "Quick: Window",
+    "description": "Analytic math over partitions (rank, running total)"
+  },
+  {
+    "id": "quick-custom",
+    "label": "Quick: Custom SQL",
+    "description": "Escape hatch: raw SQL"
+  }
+]

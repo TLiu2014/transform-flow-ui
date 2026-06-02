@@ -10,6 +10,7 @@ import {
 import { StageConfigUI } from "@/components/config/StageConfigUI";
 import { useNodeToolbarPosition } from "./NodeToolbarPositionContext";
 import type { StageNodeData } from "@/types/Pipeline";
+import type { UpstreamColumnsLookup } from "@/Schema";
 
 const POPOVER_W = 340;
 const POPOVER_H = 520;
@@ -24,6 +25,7 @@ interface PopoverStageEditorProps {
   onDelete: (id: string) => void;
   onCancel: () => void;
   confirmBeforeDelete: boolean;
+  columnsLookup?: UpstreamColumnsLookup;
 }
 
 export function PopoverStageEditor({
@@ -32,6 +34,7 @@ export function PopoverStageEditor({
   onDelete,
   onCancel,
   confirmBeforeDelete,
+  columnsLookup,
 }: PopoverStageEditorProps) {
   const position = useNodeToolbarPosition();
   const reactFlow = useReactFlow();
@@ -83,7 +86,7 @@ export function PopoverStageEditor({
       className="!pointer-events-auto !flex !flex-col [&>*]:min-h-0"
     >
       <div
-        className="nowheel box-border grid w-[340px] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+        className="nowheel box-border grid w-[340px] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl"
         style={{ maxHeight: popoverMaxHeight != null ? `${popoverMaxHeight}px` : "85vh" }}
       >
         <StageConfigUI
@@ -92,6 +95,7 @@ export function PopoverStageEditor({
           onDelete={onDelete}
           onCancel={onCancel}
           confirmBeforeDelete={confirmBeforeDelete}
+          columnsLookup={columnsLookup}
         />
       </div>
     </NodeToolbar>

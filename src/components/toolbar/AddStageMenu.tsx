@@ -26,6 +26,13 @@ const ALL_STAGES: StageType[] = [
   "GROUP",
   "SORT",
   "SELECT",
+  "PIVOT",
+  "UNPIVOT",
+  "DEDUPE",
+  "VALIDATE",
+  "LOOKUP",
+  "FORMULA",
+  "WINDOW",
   "CUSTOM",
 ];
 
@@ -48,7 +55,7 @@ export function AddStageMenu({ onAdd }: AddStageMenuProps) {
               style={{ backgroundColor: STAGE_COLORS[s] }}
             />
             <span className="text-sm">{STAGE_LABELS[s]}</span>
-            <span className="ml-auto text-[10px] text-gray-400">{s}</span>
+            <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500">{s}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

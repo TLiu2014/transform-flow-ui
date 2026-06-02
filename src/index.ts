@@ -11,12 +11,24 @@ export {
   STAGE_EDGE_HANDLE_IDS,
   DEFAULT_EDGE_SOURCE_HANDLE_ID,
   DEFAULT_EDGE_TARGET_HANDLE_ID,
+  VALIDATE_PASS_HANDLE_ID,
+  VALIDATE_FAIL_HANDLE_ID,
 } from "./components/flow/StageEdgeHandles";
 export { StageConfigUI } from "./components/config/StageConfigUI";
 export { SaveFlowButton } from "./components/toolbar/SaveFlowButton";
 export { AddStageMenu } from "./components/toolbar/AddStageMenu";
 export { DataSchemaView } from "./components/views/DataSchemaView";
 export type { DataSchemaViewProps } from "./components/views/DataSchemaView";
+export { DataTableView } from "./components/views/DataTableView";
+export type {
+  DataTableViewProps,
+  DataTableColumn,
+} from "./components/views/DataTableView";
+export { ResultsView } from "./components/views/ResultsView";
+export type {
+  ResultsViewProps,
+  StageResult,
+} from "./components/views/ResultsView";
 export { JsonView } from "./components/views/JsonView";
 export type { JsonViewProps } from "./components/views/JsonView";
 export { PipelineIOPanel } from "./components/io/PipelineIOPanel";
@@ -43,11 +55,33 @@ export type {
   SortConfig,
   SortOrder,
   SelectConfig,
+  PivotConfig,
+  UnpivotConfig,
+  DedupeConfig,
+  ValidateConfig,
+  ValidateRule,
+  LookupConfig,
+  LookupEntry,
+  LookupOutputMode,
+  FormulaConfig,
+  FormulaCategory,
+  FormulaExpressionEntry,
+  WindowConfig,
+  WindowFn,
+  WindowOperationEntry,
   CustomConfig,
   ExecutionState,
 } from "./types/Pipeline";
 
-export { STAGE_COLORS, STAGE_LABELS, TAG_COLORS, getStageColor, defaultConfigFor } from "./types/Pipeline";
+export {
+  STAGE_COLORS,
+  STAGE_LABELS,
+  TAG_COLORS,
+  WINDOW_FNS_WITHOUT_TARGET,
+  getStageColor,
+  describeStageOperation,
+  defaultConfigFor,
+} from "./types/Pipeline";
 export type { TagColor } from "./types/Pipeline";
 
 // Schema
@@ -62,6 +96,10 @@ export type {
   InferredColumn,
   StageOutputSchema,
   InferredSchemaMap,
+  AIPipelineSchema,
+  AIPipelineStage,
+  FromAIOptions,
+  UpstreamColumnsLookup,
 } from "./Schema";
 
 export {
@@ -69,6 +107,10 @@ export {
   deserializePipeline,
   validatePipelineSchema,
   inferOutputSchemas,
+  buildColumnsLookup,
+  toAISchema,
+  fromAISchema,
+  validateAIPipelineSchema,
 } from "./Schema";
 
 

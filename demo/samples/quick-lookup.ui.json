@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-lookup",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "LOOKUP: replace coded values via a static mapping."
+  },
+  "datasets": {
+    "orders": {
+      "columns": [
+        { "name": "order_id", "type": "integer" },
+        { "name": "customer_id", "type": "integer" },
+        { "name": "status_code", "type": "integer" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": { "stageType": "LOAD", "tableName": "orders", "source": "orders.csv" }
+    },
+    {
+      "id": "s1",
+      "name": "orders_labeled",
+      "type": "LOOKUP",
+      "depends_on": ["l1"],
+      "inputs": ["orders"],
+      "output": "orders_labeled",
+      "operation": {
+        "stageType": "LOOKUP",
+        "table": "orders",
+        "targetColumn": "status_code",
+        "outputType": "NEW_COLUMN",
+        "newColumnName": "status",
+        "dictionary": [
+          { "source": "1", "target": "Active" },
+          { "source": "2", "target": "Pending" },
+          { "source": "3", "target": "Shipped" },
+          { "source": "4", "target": "Delivered" }
+        ],
+        "fallbackValue": "Unknown"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "l1", "position": { "x": 160, "y": 60 } },
+      { "id": "s1", "position": { "x": 160, "y": 220 } }
+    ],
+    "edges": [{ "id": "e1", "source": "l1", "target": "s1" }]
+  }
+}

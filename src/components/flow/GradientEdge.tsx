@@ -25,7 +25,11 @@ function GradientEdgeImpl({
   selected,
 }: EdgeProps) {
   const { deleteElements } = useReactFlow();
-  const { readOnly } = useStageNodeCallbacks();
+  const { readOnly, edgeClassName } = useStageNodeCallbacks();
+  const extraEdgeClass =
+    typeof edgeClassName === "function"
+      ? (edgeClassName({ id, source, target }) ?? "")
+      : (edgeClassName ?? "");
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
@@ -74,13 +78,14 @@ function GradientEdgeImpl({
         path={path}
         markerEnd={`url(#${markerId})`}
         style={{ stroke: `url(#${gradientId})`, strokeWidth: 2.5 }}
+        className={extraEdgeClass || undefined}
       />
       {selected && !readOnly && (
         <EdgeLabelRenderer>
           <button
             type="button"
             aria-label="Delete connection"
-            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full bg-white text-gray-500 shadow-md ring-1 ring-gray-300 hover:bg-red-50 hover:text-red-600 hover:ring-red-400"
+            className="nodrag nopan absolute flex h-5 w-5 items-center justify-center rounded-full bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 dark:text-gray-500 shadow-md ring-1 ring-gray-300 hover:bg-red-50 hover:text-red-600 hover:ring-red-400"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: "all",

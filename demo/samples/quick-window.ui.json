@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-window",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "WINDOW: analytic math over partitions (rank, running total, …)."
+  },
+  "datasets": {
+    "orders": {
+      "columns": [
+        { "name": "order_id", "type": "integer" },
+        { "name": "customer_id", "type": "integer" },
+        { "name": "amount", "type": "float" },
+        { "name": "order_date", "type": "date" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": { "stageType": "LOAD", "tableName": "orders", "source": "orders.csv" }
+    },
+    {
+      "id": "s1",
+      "name": "orders_ranked",
+      "type": "WINDOW",
+      "depends_on": ["l1"],
+      "inputs": ["orders"],
+      "output": "orders_ranked",
+      "operation": {
+        "stageType": "WINDOW",
+        "table": "orders",
+        "partitionBy": ["customer_id"],
+        "orderBy": [{ "column": "order_date", "direction": "ASC" }],
+        "operations": [
+          { "fn": "ROW_NUMBER", "outputName": "purchase_seq" },
+          { "fn": "SUM", "targetColumn": "amount", "outputName": "running_total" }
+        ]
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "l1", "position": { "x": 160, "y": 60 } },
+      { "id": "s1", "position": { "x": 160, "y": 220 } }
+    ],
+    "edges": [{ "id": "e1", "source": "l1", "target": "s1" }]
+  }
+}

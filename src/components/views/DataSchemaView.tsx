@@ -4,7 +4,7 @@ import {
   type StageOutputSchema,
 } from "@/Schema";
 import type { PipelineSchema } from "@/Schema";
-import { getStageColor } from "@/types/Pipeline";
+import { describeStageOperation, getStageColor } from "@/types/Pipeline";
 
 export interface DataSchemaViewProps {
   schema: PipelineSchema;
@@ -66,7 +66,7 @@ export function DataSchemaView({
 
   if (orderedStages.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-500">
+      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">
         No stages yet. Add a stage on the canvas, or load a pipeline JSON to
         see its data schema.
       </div>
@@ -78,7 +78,7 @@ export function DataSchemaView({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-9 items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-2">
+      <div className="flex h-9 items-center gap-1 overflow-x-auto border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2">
         {orderedStages.map((s) => {
           const isActive = s.id === activeId;
           return (
@@ -89,8 +89,8 @@ export function DataSchemaView({
               className={
                 "inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-1.5 text-sm font-medium transition-colors " +
                 (isActive
-                  ? "border-blue-500 text-gray-900"
-                  : "border-transparent text-gray-600 hover:text-gray-900")
+                  ? "border-blue-500 text-gray-900 dark:text-gray-100"
+                  : "border-transparent text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100")
               }
             >
               <span
@@ -107,7 +107,7 @@ export function DataSchemaView({
         {activeInf && activeStage ? (
           <SchemaPanel
             inference={activeInf}
-            operationLabel={describeOperation(activeStage)}
+            operationLabel={describeStageOperation(activeStage.operation)}
             stageType={activeStage.type}
             inputs={activeStage.inputs}
           />
@@ -132,9 +132,9 @@ function SchemaPanel({
 }: SchemaPanelProps) {
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-gray-200 dark:border-gray-700 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:text-gray-400 dark:text-gray-500">
         <span>
-          <span className="font-mono text-gray-900">{inference.output}</span>
+          <span className="font-mono text-gray-900 dark:text-gray-100">{inference.output}</span>
           {inference.inferred ? (
             <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
               inferred
@@ -151,18 +151,18 @@ function SchemaPanel({
             <span className="font-mono">{inputs.join(", ") || "—"}</span>
           </span>
         )}
-        <span className="text-gray-500">{operationLabel}</span>
+        <span className="text-gray-500 dark:text-gray-400 dark:text-gray-500">{operationLabel}</span>
       </header>
 
       {inference.unknown ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">
             {stageType === "CUSTOM"
               ? "Custom SQL — output schema is determined at runtime."
               : "Schema could not be inferred."}
           </p>
           {stageType === "CUSTOM" && (
-            <p className="max-w-xs text-xs text-gray-400">
+            <p className="max-w-xs text-xs text-gray-400 dark:text-gray-500">
               This is a UI-only module. No SQL is executed here. The host
               application is responsible for running the transformation and
               providing results.
@@ -170,23 +170,23 @@ function SchemaPanel({
           )}
         </div>
       ) : inference.columns.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-500">
+        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">
           No columns. Configure the stage's source table.
         </div>
       ) : (
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white">
-            <tr className="border-b border-gray-200">
-              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+          <thead className="sticky top-0 bg-white dark:bg-gray-900">
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 dark:text-gray-500">
                 #
               </th>
-              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 dark:text-gray-500">
                 Column
               </th>
-              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 dark:text-gray-500">
                 Type
               </th>
-              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+              <th className="h-9 px-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 dark:text-gray-500">
                 Source
               </th>
             </tr>
@@ -195,18 +195,18 @@ function SchemaPanel({
             {inference.columns.map((c, i) => (
               <tr
                 key={`${c.name}-${i}`}
-                className="border-b border-gray-100 hover:bg-gray-50/60"
+                className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/60"
               >
-                <td className="px-3 py-1.5 text-xs text-gray-500">{i + 1}</td>
-                <td className="px-3 py-1.5 font-mono text-xs text-gray-900">
+                <td className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{i + 1}</td>
+                <td className="px-3 py-1.5 font-mono text-xs text-gray-900 dark:text-gray-100">
                   {c.name}
                 </td>
                 <td className="px-3 py-1.5">
-                  <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-700">
+                  <span className="rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 font-mono text-[11px] text-gray-700 dark:text-gray-300">
                     {c.type}
                   </span>
                 </td>
-                <td className="px-3 py-1.5 font-mono text-[11px] text-gray-500">
+                <td className="px-3 py-1.5 font-mono text-[11px] text-gray-500 dark:text-gray-400 dark:text-gray-500">
                   {c.source ?? "—"}
                 </td>
               </tr>
@@ -218,24 +218,3 @@ function SchemaPanel({
   );
 }
 
-function describeOperation(stage: PipelineSchema["stages"][number]): string {
-  const op = stage.operation;
-  switch (op.stageType) {
-    case "LOAD":
-      return op.source ? `LOAD from ${op.source}` : `LOAD ${op.tableName}`;
-    case "FILTER":
-      return `FILTER ${op.column} ${op.operator} ${op.value}`;
-    case "JOIN":
-      return `${op.joinType} JOIN ${op.leftTable}.${op.leftKey} = ${op.rightTable}.${op.rightKey}`;
-    case "UNION":
-      return `${op.unionAll ? "UNION ALL" : "UNION"} ${op.tables.length} tables`;
-    case "GROUP":
-      return `GROUP BY ${op.groupBy.join(", ") || "—"}`;
-    case "SORT":
-      return `SORT BY ${op.orderBy.map((o) => `${o.column} ${o.direction}`).join(", ") || "—"}`;
-    case "SELECT":
-      return `SELECT ${op.columns.length} columns`;
-    case "CUSTOM":
-      return "CUSTOM SQL";
-  }
-}

@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-load",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "LOAD: pull a base table from a source."
+  },
+  "datasets": {
+    "customers": {
+      "columns": [
+        { "name": "id", "type": "integer" },
+        { "name": "name", "type": "string" },
+        { "name": "country", "type": "string" },
+        { "name": "signup_date", "type": "date" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_customers",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "customers",
+      "operation": { "stageType": "LOAD", "tableName": "customers", "source": "customers.csv" }
+    }
+  ],
+  "layout": {
+    "nodes": [{ "id": "l1", "position": { "x": 160, "y": 80 } }],
+    "edges": []
+  }
+}

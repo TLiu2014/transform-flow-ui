@@ -90,8 +90,8 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       <div>
-        <h2 className="text-sm font-semibold text-gray-900">Pipeline I/O</h2>
-        <p className="mt-1 text-xs text-gray-500">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Pipeline I/O</h2>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">
           Pick a sample, or paste / upload a saved pipeline schema to render
           it on the canvas.
         </p>
@@ -99,7 +99,7 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
 
       {samples && samples.length > 0 && (
         <section className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 dark:text-gray-500">
             <Sparkles className="h-3 w-3" />
             <span>Sample pipelines</span>
           </div>
@@ -110,11 +110,11 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
                 type="button"
                 onClick={() => handleSample(s)}
                 title={s.description ?? s.label}
-                className="flex flex-col items-start gap-0.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-left text-sm shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50/40"
+                className="flex flex-col items-start gap-0.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-left text-sm shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50/40"
               >
-                <span className="font-medium text-gray-900">{s.label}</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{s.label}</span>
                 {s.description && (
-                  <span className="text-[11px] text-gray-500">
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 dark:text-gray-500">
                     {s.description}
                   </span>
                 )}
@@ -125,11 +125,11 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
       )}
 
       <section className="space-y-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 dark:text-gray-500">
           Load your own
         </div>
 
-        <label className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+        <label className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800">
           <Upload className="h-4 w-4" />
           Upload .json
           <input
@@ -144,7 +144,7 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
           />
         </label>
 
-        <div className="text-center text-[11px] uppercase tracking-wide text-gray-400">
+        <div className="text-center text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
           or paste
         </div>
 
@@ -154,7 +154,7 @@ export function PipelineIOPanel({ onLoad, samples }: PipelineIOPanelProps) {
           rows={10}
           spellCheck={false}
           placeholder='{ "version": "1.0", "pipeline": { ... }, "stages": [ ... ], "layout": { ... } }'
-          className="min-h-[160px] w-full resize-none rounded-md border border-gray-300 bg-white p-2 font-mono text-[11px] text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="min-h-[160px] w-full resize-none rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-2 font-mono text-[11px] text-gray-800 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
 
         <button

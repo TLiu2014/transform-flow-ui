@@ -30,7 +30,13 @@ import {
 import { Eye, Pencil } from "lucide-react";
 import { StageConfigUI } from "@/components/config/StageConfigUI";
 import { FlowCanvasToolbar } from "@/components/flow/FlowCanvasToolbar";
-import { deserializePipeline, serializePipeline, type PipelineSchema } from "@/Schema";
+import {
+  buildColumnsLookup,
+  deserializePipeline,
+  serializePipeline,
+  type PipelineSchema,
+  type UpstreamColumnsLookup,
+} from "@/Schema";
 import { STAGE_LABELS, defaultConfigFor, getStageColor, type StageNodeData, type StageType } from "@/types/Pipeline";
 import {
   DEFAULT_EDGE_SOURCE_HANDLE_ID,
@@ -40,11 +46,19 @@ import { GradientEdge } from "./GradientEdge";
 import { NodeToolbarPositionProvider } from "./NodeToolbarPositionContext";
 import { PopoverStageEditor } from "./PopoverStageEditor";
 import { StageNode } from "./StageNode";
-import { StageNodeContext, type StageNodeCallbacks } from "./StageNodeContext";
+import {
+  StageNodeContext,
+  type NodeClassNameProvider,
+  type StageNodeCallbacks,
+} from "./StageNodeContext";
 
 export interface TransformationFlowHandle {
   /** Adds a new stage node to the canvas and opens its edit form. */
   addStage: (stageType: StageType) => void;
+  /** Step backward through the canvas's edit history. Returns true if something was undone. */
+  undo: () => boolean;
+  /** Step forward through the canvas's edit history. Returns true if something was redone. */
+  redo: () => boolean;
 }
 
 export interface TransformationFlowProps {
@@ -68,10 +82,34 @@ export interface TransformationFlowProps {
   confirmBeforeDelete?: boolean;
   /** When true, the canvas is view-only: no edits, no connections, no deletions. Node dragging is still allowed. */
   readOnly?: boolean;
+  /** Extra classes for the outermost canvas wrapper. */
+  className?: string;
+  /**
+   * Extra classes for every stage node's root. A function receives the node's
+   * data and may return a class string that varies per stageType / config.
+   */
+  nodeClassName?: NodeClassNameProvider;
+  /**
+   * Extra classes for the gradient edge path. A function receives the Edge
+   * and may return a string varying per source/target.
+   */
+  edgeClassName?: string | ((edge: Edge) => string | undefined);
+  /**
+   * When true, nodes show richer animated treatment for `executionState`
+   * (pulsing ring while running, color ring on success/error). Default off.
+   */
+  richExecutionState?: boolean;
 }
 
 const nodeTypes: NodeTypes = { stageNode: StageNode };
 const edgeTypes: EdgeTypes = { gradient: GradientEdge };
+
+interface HistorySnapshot {
+  nodes: Node<StageNodeData>[];
+  edges: Edge[];
+}
+
+const HISTORY_LIMIT = 50;
 
 function withDefaultHandles(e: Edge): Edge {
   return {
@@ -92,6 +130,10 @@ export const TransformationFlow = forwardRef<
     configDisplayMode = "popover",
     confirmBeforeDelete = true,
     readOnly = false,
+    className,
+    nodeClassName,
+    edgeClassName,
+    richExecutionState,
   },
   ref,
 ) {
@@ -119,6 +161,20 @@ export const TransformationFlow = forwardRef<
   // own onChange round-trips from the host.
   const lastEmitted = useRef<PipelineSchema | null>(null);
 
+  // ── Undo / redo history ─────────────────────────────────────────────────
+  // Snapshots are taken in commit() before applying each user-driven change.
+  // We don't snapshot during deserialize (loading a new schema clears history).
+  const historyRef = useRef<{ past: HistorySnapshot[]; future: HistorySnapshot[] }>({
+    past: [],
+    future: [],
+  });
+  // Bumping a counter is the cheapest way to re-render undo/redo buttons
+  // without storing the history in React state (which would force expensive
+  // structural compares for every keystroke during color preview).
+  const [, setHistoryVer] = useState(0);
+  const canUndo = historyRef.current.past.length > 0;
+  const canRedo = historyRef.current.future.length > 0;
+
   // Load (or reload) from the schema prop — only when it's a genuinely new
   // schema from outside, not one we emitted ourselves.
   useEffect(() => {
@@ -131,6 +187,10 @@ export const TransformationFlow = forwardRef<
     setEdges(newEdges.map(withDefaultHandles));
     setSelectedNodeId(null);
     setEditingNodeId(null);
+    // A fresh pipeline starts with a fresh history — preventing users from
+    // "undoing" back into a pipeline they didn't author.
+    historyRef.current = { past: [], future: [] };
+    setHistoryVer((v) => v + 1);
   }, [schema]);
 
   const emit = useCallback(
@@ -144,6 +204,75 @@ export const TransformationFlow = forwardRef<
     },
     [onChange],
   );
+
+  /**
+   * Records a snapshot of the previous (nodes, edges) before applying a new
+   * one, then updates local state and emits. `coalesce: true` indicates a
+   * transient preview (e.g. color picker swatch click) that should fold into
+   * the prior history entry rather than create a new one.
+   */
+  const commit = useCallback(
+    (
+      nextNodes: Node<StageNodeData>[],
+      nextEdges: Edge[],
+      opts?: { coalesce?: boolean },
+    ) => {
+      const coalesce = opts?.coalesce ?? false;
+      const prev: HistorySnapshot = {
+        nodes: nodesRef.current,
+        edges: edgesRef.current,
+      };
+      // Coalesced emits don't push a new entry — the prior "past" top remains
+      // the pre-spree state. If history is empty (first edit), seed it so
+      // undo has something to revert to.
+      if (!coalesce) {
+        const next = [...historyRef.current.past, prev];
+        historyRef.current.past =
+          next.length > HISTORY_LIMIT ? next.slice(-HISTORY_LIMIT) : next;
+      } else if (historyRef.current.past.length === 0) {
+        historyRef.current.past = [prev];
+      }
+      // Any new edit invalidates the redo branch.
+      historyRef.current.future = [];
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      emit(nextNodes, nextEdges);
+      setHistoryVer((v) => v + 1);
+    },
+    [emit],
+  );
+
+  const undo = useCallback((): boolean => {
+    const past = historyRef.current.past;
+    if (past.length === 0) return false;
+    const prev = past[past.length - 1];
+    historyRef.current.past = past.slice(0, -1);
+    historyRef.current.future = [
+      { nodes: nodesRef.current, edges: edgesRef.current },
+      ...historyRef.current.future,
+    ];
+    setNodes(prev.nodes);
+    setEdges(prev.edges);
+    emit(prev.nodes, prev.edges);
+    setHistoryVer((v) => v + 1);
+    return true;
+  }, [emit]);
+
+  const redo = useCallback((): boolean => {
+    const future = historyRef.current.future;
+    if (future.length === 0) return false;
+    const next = future[0];
+    historyRef.current.future = future.slice(1);
+    historyRef.current.past = [
+      ...historyRef.current.past,
+      { nodes: nodesRef.current, edges: edgesRef.current },
+    ];
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    emit(next.nodes, next.edges);
+    setHistoryVer((v) => v + 1);
+    return true;
+  }, [emit]);
 
   // ── Canvas event handlers ────────────────────────────────────────────────
 
@@ -163,16 +292,14 @@ export const TransformationFlow = forwardRef<
         const newEdges = edgesRef.current.filter(
           (e) => !removedIds.has(e.source) && !removedIds.has(e.target),
         );
-        setNodes(newNodes);
-        setEdges(newEdges);
         setSelectedNodeId((cur) => (cur && removedIds.has(cur) ? null : cur));
         setEditingNodeId((cur) => (cur && removedIds.has(cur) ? null : cur));
-        emit(newNodes, newEdges);
+        commit(newNodes, newEdges);
       } else {
         setNodes((ns) => applyNodeChanges(others, ns) as Node<StageNodeData>[]);
       }
     },
-    [emit],
+    [commit],
   );
 
   const handleEdgesChange = useCallback(
@@ -187,13 +314,12 @@ export const TransformationFlow = forwardRef<
             ? applyEdgeChanges(others, edgesRef.current)
             : edgesRef.current;
         const newEdges = baseEdges.filter((e) => !removedIds.has(e.id));
-        setEdges(newEdges);
-        emit(nodesRef.current, newEdges);
+        commit(nodesRef.current, newEdges);
       } else {
         setEdges((es) => applyEdgeChanges(others, es));
       }
     },
-    [emit],
+    [commit],
   );
 
   const handleConnect = useCallback(
@@ -203,11 +329,41 @@ export const TransformationFlow = forwardRef<
         withDefaultHandles({ ...connection, type: "gradient" } as Edge),
         edgesRef.current,
       );
-      setEdges(newEdges);
-      emit(nodesRef.current, newEdges);
+      commit(nodesRef.current, newEdges);
     },
-    [emit],
+    [commit],
   );
+
+  // Drag uses a snapshot taken at drag-start so the history records the
+  // pre-drag positions (not the post-drag positions that nodesRef holds at
+  // drag-stop). A null snapshot means no drag in progress.
+  const dragSnapshotRef = useRef<HistorySnapshot | null>(null);
+
+  const handleNodeDragStart = useCallback(() => {
+    dragSnapshotRef.current = {
+      nodes: nodesRef.current,
+      edges: edgesRef.current,
+    };
+  }, []);
+
+  const handleNodeDragStop = useCallback(() => {
+    const prev = dragSnapshotRef.current;
+    dragSnapshotRef.current = null;
+    if (!prev) {
+      emit(nodesRef.current, edgesRef.current);
+      return;
+    }
+    // Click without movement: no nodes-array re-creation, skip history.
+    if (prev.nodes === nodesRef.current && prev.edges === edgesRef.current) {
+      return;
+    }
+    const next = [...historyRef.current.past, prev];
+    historyRef.current.past =
+      next.length > HISTORY_LIMIT ? next.slice(-HISTORY_LIMIT) : next;
+    historyRef.current.future = [];
+    setHistoryVer((v) => v + 1);
+    emit(nodesRef.current, edgesRef.current);
+  }, [emit]);
 
   const reconnectSucceeded = useRef(false);
 
@@ -255,16 +411,16 @@ export const TransformationFlow = forwardRef<
       }
       reconnectSucceeded.current = true;
       const newEdges = reconnectEdge(oldEdge, newConnection, edgesRef.current);
-      setEdges(newEdges);
-      emit(nodesRef.current, newEdges);
+      commit(nodesRef.current, newEdges);
     },
-    [emit, isReadOnly],
+    [commit, isReadOnly],
   );
 
   const handleReconnectEnd = useCallback((_: unknown, edge: Edge) => {
     if (!reconnectSucceeded.current) {
       // Drag dropped to nothing or rejected — restore the edge if React Flow
-      // removed it via onEdgesChange.
+      // removed it via onEdgesChange. Restoration is not a user-driven edit,
+      // so we patch local state directly without going through commit().
       setEdges((prev) =>
         prev.some((e) => e.id === edge.id) ? prev : [...prev, edge],
       );
@@ -273,6 +429,35 @@ export const TransformationFlow = forwardRef<
     validReconnectNodeIdRef.current = null;
     selfLoopReconnectNodeIdRef.current = null;
   }, []);
+
+  // ── Keyboard shortcuts: Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z (or Y) redo ───
+  useEffect(() => {
+    if (isReadOnly) return;
+    const handler = (e: KeyboardEvent) => {
+      // Defer to native undo when focus is in a form field — the user is
+      // editing text, not the canvas.
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          (t as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+      const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        if (undo()) e.preventDefault();
+      } else if ((k === "z" && e.shiftKey) || k === "y") {
+        if (redo()) e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [undo, redo, isReadOnly]);
 
   // ── Node interaction ─────────────────────────────────────────────────────
 
@@ -303,10 +488,14 @@ export const TransformationFlow = forwardRef<
       const newNodes = nodesRef.current.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
       );
-      setNodes(newNodes);
-      emit(newNodes, edgesRef.current);
+      // Color-only patches are transient previews (the color picker writes
+      // one per swatch click). Coalesce them so the user gets one undo step
+      // per editor session, not one per click.
+      const isColorPreview =
+        Object.keys(patch).length === 1 && "color" in patch;
+      commit(newNodes, edgesRef.current, { coalesce: isColorPreview });
     },
-    [emit],
+    [commit],
   );
 
   const handleDelete = useCallback(
@@ -315,13 +504,11 @@ export const TransformationFlow = forwardRef<
       const newEdges = edgesRef.current.filter(
         (e) => e.source !== id && e.target !== id,
       );
-      setNodes(newNodes);
-      setEdges(newEdges);
       setSelectedNodeId((cur) => (cur === id ? null : cur));
       setEditingNodeId((cur) => (cur === id ? null : cur));
-      emit(newNodes, newEdges);
+      commit(newNodes, newEdges);
     },
-    [emit],
+    [commit],
   );
 
   // ── Imperative handle (addStage) ─────────────────────────────────────────
@@ -346,15 +533,18 @@ export const TransformationFlow = forwardRef<
         },
       };
       const newNodes = [...nodesRef.current, newNode];
-      setNodes(newNodes);
       setSelectedNodeId(id);
       setEditingNodeId(id);
-      emit(newNodes, edgesRef.current);
+      commit(newNodes, edgesRef.current);
     },
-    [emit],
+    [commit],
   );
 
-  useImperativeHandle(ref, () => ({ addStage }), [addStage]);
+  useImperativeHandle(
+    ref,
+    () => ({ addStage, undo, redo }),
+    [addStage, undo, redo],
+  );
 
   // ── Derived state for render ─────────────────────────────────────────────
 
@@ -363,21 +553,40 @@ export const TransformationFlow = forwardRef<
     [nodes, editingNodeId],
   );
 
+  // Column-aware editor support: rebuild lookup whenever the canvas changes
+  // so dropdowns reflect the live (saved) schema. Cheap to recompute since
+  // inferOutputSchemas walks stages linearly.
+  const columnsLookup = useMemo<UpstreamColumnsLookup>(() => {
+    const liveSchema = serializePipeline(nodes, edges, {
+      name: pipelineNameRef.current,
+    });
+    return buildColumnsLookup(liveSchema);
+  }, [nodes, edges]);
+
   const decoratedNodes = useMemo(
     () => nodes.map((n) => ({ ...n, selected: n.id === selectedNodeId })),
     [nodes, selectedNodeId],
   );
 
   const callbacks = useMemo<StageNodeCallbacks>(
-    () => ({ onShowOutput, onEdit: isReadOnly ? undefined : handleEditNode, readOnly: isReadOnly, validReconnectNodeIdRef, selfLoopReconnectNodeIdRef }),
+    () => ({
+      onShowOutput,
+      onEdit: isReadOnly ? undefined : handleEditNode,
+      readOnly: isReadOnly,
+      validReconnectNodeIdRef,
+      selfLoopReconnectNodeIdRef,
+      nodeClassName,
+      richExecutionState,
+      edgeClassName,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onShowOutput, isReadOnly],
+    [onShowOutput, isReadOnly, nodeClassName, richExecutionState, edgeClassName],
   );
 
   return (
     <StageNodeContext.Provider value={callbacks}>
       <NodeToolbarPositionProvider value={popoverPosition}>
-        <div className="flex h-full min-h-[480px]">
+        <div className={`flex h-full min-h-[480px] ${className ?? ""}`}>
           <div className="relative min-w-0 flex-1">
             <div className="pointer-events-none absolute left-2 top-2 z-20">
               <button
@@ -388,7 +597,7 @@ export const TransformationFlow = forwardRef<
                 }}
                 title={isReadOnly ? "Switch to edit mode" : "Switch to view-only mode"}
                 aria-label={isReadOnly ? "Switch to edit mode" : "Switch to view-only mode"}
-                className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/95 px-3 text-xs font-medium text-gray-700 shadow-md backdrop-blur hover:bg-gray-50"
+                className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/95 px-3 text-xs font-medium text-gray-700 dark:text-gray-300 shadow-md backdrop-blur hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 {isReadOnly ? (
                   <>
@@ -411,6 +620,10 @@ export const TransformationFlow = forwardRef<
                   editPanelPosition={popoverPosition}
                   onEditPanelPositionChange={setPopoverPosition}
                   onAddStage={addStage}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  onUndo={undo}
+                  onRedo={redo}
                 />
               </div>
             )}
@@ -426,7 +639,8 @@ export const TransformationFlow = forwardRef<
               onReconnectEnd={handleReconnectEnd}
               onNodeClick={(_, node) => handleNodeClick(node as Node<StageNodeData>)}
               onNodeDoubleClick={(_, node) => handleNodeDoubleClick(node as Node<StageNodeData>)}
-              onNodeDragStop={() => emit(nodesRef.current, edgesRef.current)}
+              onNodeDragStart={handleNodeDragStart}
+              onNodeDragStop={handleNodeDragStop}
               onPaneClick={handlePaneClick}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
@@ -448,7 +662,7 @@ export const TransformationFlow = forwardRef<
                   const data = n.data as StageNodeData | undefined;
                   return data ? getStageColor(data) : "#9ca3af";
                 }}
-                className="!bg-white"
+                className="!bg-white dark:bg-gray-900"
               />
               {!isReadOnly && configDisplayMode === "popover" && editingNode && (
                 <PopoverStageEditor
@@ -457,13 +671,14 @@ export const TransformationFlow = forwardRef<
                   onDelete={handleDelete}
                   onCancel={() => setEditingNodeId(null)}
                   confirmBeforeDelete={confirmBeforeDelete}
+                  columnsLookup={columnsLookup}
                 />
               )}
             </ReactFlow>
           </div>
 
           {!isReadOnly && configDisplayMode === "panel" && (
-            <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
+            <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
               <StageConfigUI
                 node={editingNode}
                 onUpdate={(id, patch) => {
@@ -473,6 +688,7 @@ export const TransformationFlow = forwardRef<
                 onDelete={handleDelete}
                 onCancel={() => setEditingNodeId(null)}
                 confirmBeforeDelete={confirmBeforeDelete}
+                columnsLookup={columnsLookup}
               />
             </div>
           )}

@@ -1,0 +1,68 @@
+{
+  "datasets": {
+    "products": {
+      "columns": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "price",
+          "type": "float"
+        },
+        {
+          "name": "quantity",
+          "type": "integer"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_products",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "products",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "products",
+        "source": "products.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "products_enriched",
+      "type": "FORMULA",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "products"
+      ],
+      "output": "products_enriched",
+      "operation": {
+        "stageType": "FORMULA",
+        "table": "products",
+        "expressions": [
+          {
+            "outputColumn": "total",
+            "category": "MATH",
+            "expression": "price * quantity"
+          },
+          {
+            "outputColumn": "name_upper",
+            "category": "STRING",
+            "expression": "UPPER(name)"
+          },
+          {
+            "outputColumn": "tier",
+            "category": "CONDITIONAL",
+            "expression": "IF(price > 100, 'premium', 'standard')"
+          }
+        ]
+      }
+    }
+  ]
+}

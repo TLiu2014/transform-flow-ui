@@ -6,6 +6,8 @@ import {
   ArrowUp,
   ChevronLeft,
   ChevronRight,
+  Redo2,
+  Undo2,
   Wrench,
 } from "lucide-react";
 
@@ -29,6 +31,11 @@ export interface FlowCanvasToolbarProps {
   editPanelPosition: Position;
   onEditPanelPositionChange: (position: Position) => void;
   onAddStage: (stageType: StageType) => void;
+  /** Undo button is rendered when canUndo/onUndo are both provided. */
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export function FlowCanvasToolbar({
@@ -37,14 +44,19 @@ export function FlowCanvasToolbar({
   editPanelPosition,
   onEditPanelPositionChange,
   onAddStage,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: FlowCanvasToolbarProps) {
+  const showHistory = onUndo != null || onRedo != null;
   return (
     <>
       {!expanded ? (
         <button
           type="button"
           onClick={() => onExpandedChange(true)}
-          className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/95 px-3 text-xs font-medium text-gray-700 shadow-md backdrop-blur hover:bg-gray-50"
+          className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/95 px-3 text-xs font-medium text-gray-700 dark:text-gray-300 shadow-md backdrop-blur hover:bg-gray-50 dark:hover:bg-gray-800"
           aria-label="Expand flow tools"
           aria-expanded={false}
         >
@@ -53,15 +65,15 @@ export function FlowCanvasToolbar({
           <ChevronRight className="h-4 w-4" />
         </button>
       ) : (
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-md backdrop-blur">
-          <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/95 p-2 shadow-md backdrop-blur">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 dark:text-gray-500">
               Flow tools
             </span>
             <button
               type="button"
               onClick={() => onExpandedChange(false)}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
               aria-label="Collapse flow tools"
               aria-expanded
             >
@@ -71,8 +83,35 @@ export function FlowCanvasToolbar({
 
           <AddStageMenu onAdd={onAddStage} />
 
+          {showHistory && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={onUndo}
+                disabled={!canUndo}
+                title="Undo (Cmd/Ctrl+Z)"
+                aria-label="Undo"
+                className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                Undo
+              </button>
+              <button
+                type="button"
+                onClick={onRedo}
+                disabled={!canRedo}
+                title="Redo (Cmd/Ctrl+Shift+Z)"
+                aria-label="Redo"
+                className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+                Redo
+              </button>
+            </div>
+          )}
+
           <div className="space-y-1.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 dark:text-gray-500">
               Edit panel (popover)
             </div>
             <div className="flex flex-wrap gap-1">
@@ -87,10 +126,10 @@ export function FlowCanvasToolbar({
                     aria-pressed={active}
                     onClick={() => onEditPanelPositionChange(value)}
                     className={
-                      "inline-flex h-8 w-8 items-center justify-center rounded-md border text-gray-600 shadow-sm transition-colors " +
+                      "inline-flex h-8 w-8 items-center justify-center rounded-md border text-gray-600 dark:text-gray-400 dark:text-gray-500 shadow-sm transition-colors " +
                       (active
                         ? "border-blue-500 bg-blue-50 text-blue-800"
-                        : "border-gray-200 bg-white hover:bg-gray-50")
+                        : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800")
                     }
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -98,7 +137,7 @@ export function FlowCanvasToolbar({
                 );
               })}
             </div>
-            <p className="text-[10px] leading-snug text-gray-400">
+            <p className="text-[10px] leading-snug text-gray-400 dark:text-gray-500">
               Applies when stage config is pinned to the node (not the fixed
               right panel).
             </p>

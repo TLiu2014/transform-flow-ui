@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-union",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "UNION: stack two tables with the same columns into one."
+  },
+  "datasets": {
+    "q1_sales": {
+      "columns": [
+        { "name": "region", "type": "string" },
+        { "name": "revenue", "type": "float" }
+      ]
+    },
+    "q2_sales": {
+      "columns": [
+        { "name": "region", "type": "string" },
+        { "name": "revenue", "type": "float" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_q1",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "q1_sales",
+      "operation": { "stageType": "LOAD", "tableName": "q1_sales", "source": "q1_sales.csv" }
+    },
+    {
+      "id": "l2",
+      "name": "load_q2",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "q2_sales",
+      "operation": { "stageType": "LOAD", "tableName": "q2_sales", "source": "q2_sales.csv" }
+    },
+    {
+      "id": "s1",
+      "name": "all_sales",
+      "type": "UNION",
+      "depends_on": ["l1", "l2"],
+      "inputs": ["q1_sales", "q2_sales"],
+      "output": "all_sales",
+      "operation": {
+        "stageType": "UNION",
+        "tables": ["q1_sales", "q2_sales"],
+        "unionAll": true
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "l1", "position": { "x": 60, "y": 60 } },
+      { "id": "l2", "position": { "x": 320, "y": 60 } },
+      { "id": "s1", "position": { "x": 190, "y": 240 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": "l1", "target": "s1" },
+      { "id": "e2", "source": "l2", "target": "s1" }
+    ]
+  }
+}

@@ -1,4 +1,9 @@
 import { type MutableRefObject, createContext, useContext } from "react";
+import type { StageNodeData } from "@/types/Pipeline";
+
+export type NodeClassNameProvider =
+  | string
+  | ((data: StageNodeData) => string | undefined);
 
 export interface StageNodeCallbacks {
   /**
@@ -26,6 +31,16 @@ export interface StageNodeCallbacks {
    * always an invalid target. Null outside an active drag.
    */
   selfLoopReconnectNodeIdRef?: MutableRefObject<string | null>;
+  /**
+   * Optional caller-supplied extra classes for every stage node's root.
+   * Strings are appended verbatim; functions can vary per stage by reading
+   * `data.stageType`, `data.config.stageType`, etc.
+   */
+  nodeClassName?: NodeClassNameProvider;
+  /** When true, the lib applies richer animated treatment to executionState. */
+  richExecutionState?: boolean;
+  /** Caller-supplied extra classes for the edge SVG path. */
+  edgeClassName?: string | ((edge: { id: string; source: string; target: string }) => string | undefined);
 }
 
 export const StageNodeContext = createContext<StageNodeCallbacks>({});

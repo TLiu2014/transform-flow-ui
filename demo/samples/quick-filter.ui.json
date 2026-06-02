@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-filter",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "FILTER: keep rows matching a predicate."
+  },
+  "datasets": {
+    "orders": {
+      "columns": [
+        { "name": "order_id", "type": "integer" },
+        { "name": "customer_id", "type": "integer" },
+        { "name": "amount", "type": "float" },
+        { "name": "status", "type": "string" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": { "stageType": "LOAD", "tableName": "orders", "source": "orders.csv" }
+    },
+    {
+      "id": "s1",
+      "name": "shipped_orders",
+      "type": "FILTER",
+      "depends_on": ["l1"],
+      "inputs": ["orders"],
+      "output": "shipped_orders",
+      "operation": {
+        "stageType": "FILTER",
+        "table": "orders",
+        "column": "status",
+        "operator": "=",
+        "value": "shipped"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "l1", "position": { "x": 160, "y": 60 } },
+      { "id": "s1", "position": { "x": 160, "y": 220 } }
+    ],
+    "edges": [{ "id": "e1", "source": "l1", "target": "s1" }]
+  }
+}

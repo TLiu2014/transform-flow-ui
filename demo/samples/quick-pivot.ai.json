@@ -1,0 +1,55 @@
+{
+  "datasets": {
+    "quarterly_sales": {
+      "columns": [
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "quarter",
+          "type": "string"
+        },
+        {
+          "name": "revenue",
+          "type": "float"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_quarterly_sales",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "quarterly_sales",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "quarterly_sales",
+        "source": "quarterly_sales.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "revenue_pivot",
+      "type": "PIVOT",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "quarterly_sales"
+      ],
+      "output": "revenue_pivot",
+      "operation": {
+        "stageType": "PIVOT",
+        "table": "quarterly_sales",
+        "indexColumn": "region",
+        "columnsColumn": "quarter",
+        "valuesColumn": "revenue",
+        "aggregation": "SUM"
+      }
+    }
+  ]
+}

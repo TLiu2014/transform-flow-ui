@@ -1,0 +1,70 @@
+{
+  "datasets": {
+    "sales_wide": {
+      "columns": [
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "q1",
+          "type": "float"
+        },
+        {
+          "name": "q2",
+          "type": "float"
+        },
+        {
+          "name": "q3",
+          "type": "float"
+        },
+        {
+          "name": "q4",
+          "type": "float"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_sales_wide",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "sales_wide",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "sales_wide",
+        "source": "sales_wide.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "sales_long",
+      "type": "UNPIVOT",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "sales_wide"
+      ],
+      "output": "sales_long",
+      "operation": {
+        "stageType": "UNPIVOT",
+        "table": "sales_wide",
+        "idColumns": [
+          "region"
+        ],
+        "valueColumns": [
+          "q1",
+          "q2",
+          "q3",
+          "q4"
+        ],
+        "nameColumn": "quarter",
+        "valueColumn": "revenue"
+      }
+    }
+  ]
+}

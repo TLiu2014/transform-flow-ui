@@ -1,0 +1,86 @@
+{
+  "datasets": {
+    "customers": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "country",
+          "type": "string"
+        }
+      ]
+    },
+    "orders": {
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer"
+        },
+        {
+          "name": "customer_id",
+          "type": "integer"
+        },
+        {
+          "name": "amount",
+          "type": "float"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_customers",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "customers",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "customers",
+        "source": "customers.csv"
+      }
+    },
+    {
+      "id": "l2",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "orders",
+        "source": "orders.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "customer_orders",
+      "type": "JOIN",
+      "depends_on": [
+        "l1",
+        "l2"
+      ],
+      "inputs": [
+        "customers",
+        "orders"
+      ],
+      "output": "customer_orders",
+      "operation": {
+        "stageType": "JOIN",
+        "joinType": "INNER",
+        "leftTable": "customers",
+        "rightTable": "orders",
+        "leftKey": "id",
+        "rightKey": "customer_id"
+      }
+    }
+  ]
+}

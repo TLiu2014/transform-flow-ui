@@ -1,0 +1,58 @@
+{
+  "datasets": {
+    "signups": {
+      "columns": [
+        {
+          "name": "email",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "signup_date",
+          "type": "date"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_signups",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "signups",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "signups",
+        "source": "signups.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "unique_signups",
+      "type": "DEDUPE",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "signups"
+      ],
+      "output": "unique_signups",
+      "operation": {
+        "stageType": "DEDUPE",
+        "table": "signups",
+        "keyColumns": [
+          "email"
+        ],
+        "keepBy": {
+          "column": "signup_date",
+          "direction": "DESC"
+        }
+      }
+    }
+  ]
+}

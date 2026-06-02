@@ -1,0 +1,66 @@
+{
+  "datasets": {
+    "orders": {
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "integer"
+        },
+        {
+          "name": "country",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "float"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_orders",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "orders",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "orders",
+        "source": "orders.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "revenue_by_country",
+      "type": "GROUP",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [
+        "orders"
+      ],
+      "output": "revenue_by_country",
+      "operation": {
+        "stageType": "GROUP",
+        "table": "orders",
+        "groupBy": [
+          "country"
+        ],
+        "aggregations": [
+          {
+            "fn": "SUM",
+            "column": "amount",
+            "alias": "revenue"
+          },
+          {
+            "fn": "COUNT",
+            "column": "order_id",
+            "alias": "order_count"
+          }
+        ]
+      }
+    }
+  ]
+}

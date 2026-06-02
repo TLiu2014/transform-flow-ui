@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "pipeline": {
+    "name": "quick-custom",
+    "createdAt": "2026-05-30T00:00:00.000Z",
+    "description": "CUSTOM: escape hatch — write SQL directly."
+  },
+  "datasets": {
+    "events": {
+      "columns": [
+        { "name": "id", "type": "integer" },
+        { "name": "name", "type": "string" },
+        { "name": "created_at", "type": "timestamp" }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_events",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "events",
+      "operation": { "stageType": "LOAD", "tableName": "events", "source": "events.csv" }
+    },
+    {
+      "id": "s1",
+      "name": "recent_events",
+      "type": "CUSTOM",
+      "depends_on": ["l1"],
+      "inputs": [],
+      "output": "recent_events",
+      "operation": {
+        "stageType": "CUSTOM",
+        "sql": "SELECT * FROM events WHERE created_at >= NOW() - INTERVAL '7 days'"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": [
+      { "id": "l1", "position": { "x": 160, "y": 60 } },
+      { "id": "s1", "position": { "x": 160, "y": 220 } }
+    ],
+    "edges": [{ "id": "e1", "source": "l1", "target": "s1" }]
+  }
+}

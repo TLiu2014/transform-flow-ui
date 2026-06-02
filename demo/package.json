@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "regen-ai-samples": "node scripts/regen-ai-samples.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.10.2",

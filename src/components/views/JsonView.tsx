@@ -53,9 +53,9 @@ export function JsonView({ schema }: JsonViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2 text-xs text-gray-600">
-          <span className="font-mono text-gray-900">
+      <header className="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-gray-600 dark:text-gray-400 dark:text-gray-500">
+          <span className="font-mono text-gray-900 dark:text-gray-100">
             {schema.pipeline.name}
           </span>
           <span>·</span>
@@ -64,19 +64,19 @@ export function JsonView({ schema }: JsonViewProps) {
           <span>{Object.keys(schema.datasets).length} datasets</span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="mr-1 flex items-center gap-0.5 rounded border border-gray-300 bg-white px-0.5 shadow-sm">
+          <div className="mr-1 flex items-center gap-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-0.5 shadow-sm">
             <button
               type="button"
               onClick={zoomOut}
               disabled={fontSizePx <= JSON_FONT_MIN_PX}
               title="Smaller text"
               aria-label="Smaller text"
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-600 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:pointer-events-none disabled:opacity-40"
             >
               <Minus className="h-3.5 w-3.5" />
             </button>
             <span
-              className="min-w-[2.25rem] select-none text-center font-mono text-[10px] text-gray-500"
+              className="min-w-[2.25rem] select-none text-center font-mono text-[10px] text-gray-500 dark:text-gray-400 dark:text-gray-500"
               title="JSON font size"
             >
               {fontSizePx}px
@@ -87,7 +87,7 @@ export function JsonView({ schema }: JsonViewProps) {
               disabled={fontSizePx >= JSON_FONT_MAX_PX}
               title="Larger text"
               aria-label="Larger text"
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-600 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:pointer-events-none disabled:opacity-40"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -135,7 +135,7 @@ function ToolbarButton({
         "inline-flex h-7 items-center gap-1 rounded border px-2 text-[11px] font-medium shadow-sm " +
         (highlight
           ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-          : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50")
+          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800")
       }
     >
       <Icon className="h-3 w-3" />

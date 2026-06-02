@@ -130,6 +130,13 @@ function collectStageInputs(config: StageConfig): string[] {
     case "GROUP":
     case "SORT":
     case "SELECT":
+    case "PIVOT":
+    case "UNPIVOT":
+    case "DEDUPE":
+    case "VALIDATE":
+    case "LOOKUP":
+    case "FORMULA":
+    case "WINDOW":
       return config.table ? [config.table] : [];
     case "JOIN":
       return [config.leftTable, config.rightTable].filter(Boolean) as string[];
@@ -235,6 +242,134 @@ export function deserializePipeline(schema: PipelineSchema): DeserializedPipelin
   };
 }
 
+/* ------------------------------------------------------------------------- *
+ * AI / agent payload
+ *
+ * The model is treated as a stateless processor: feed it the data contract
+ * (datasets + stages), get SQL back. Versioning, pipeline metadata, and
+ * canvas layout are host-side concerns — they live in the prompt or the
+ * surrounding UI, not in the payload.
+ * ------------------------------------------------------------------------- */
+
+/** Stage as seen by the model. UI-only fields stripped. */
+export interface AIPipelineStage {
+  id: string;
+  name: string;
+  type: StageType;
+  depends_on: string[];
+  inputs: string[];
+  output: string;
+  operation: StageConfig;
+}
+
+/** Minimal payload for the model: just the data contract. */
+export interface AIPipelineSchema {
+  datasets: Record<string, DatasetSchema>;
+  stages: AIPipelineStage[];
+}
+
+/**
+ * Strip everything the model doesn't need and return the schema-only
+ * payload. Pipeline name/description, version, layout, and per-stage
+ * cosmetics (color, displayType) are intentionally dropped — pass any
+ * pipeline-level intent (name, dialect, engine, etc.) via the prompt.
+ */
+export function toAISchema(schema: PipelineSchema): AIPipelineSchema {
+  const stages: AIPipelineStage[] = schema.stages.map((s) => ({
+    id: s.id,
+    name: s.name,
+    type: s.type,
+    depends_on: [...s.depends_on],
+    inputs: [...s.inputs],
+    output: s.output,
+    operation: s.operation,
+  }));
+
+  return {
+    datasets: schema.datasets,
+    stages,
+  };
+}
+
+export interface FromAIOptions {
+  /**
+   * Previous UI-side schema. When provided:
+   *  - UI-only fields (`color`, `displayType`) on stages with matching ids
+   *    are restored.
+   *  - `pipeline.name` / `description` / `createdAt` are preserved.
+   *  - `layout` entries for surviving stages are preserved.
+   */
+  base?: PipelineSchema;
+}
+
+/**
+ * Inverse of toAISchema: project a model response back into a full
+ * PipelineSchema. The model only carries `datasets` and `stages`, so
+ * everything else (pipeline metadata, layout, per-stage cosmetics) is
+ * reconstructed from `options.base` when available.
+ */
+export function fromAISchema(
+  ai: AIPipelineSchema,
+  options: FromAIOptions = {},
+): PipelineSchema {
+  const { base } = options;
+  const baseStageById = new Map(base?.stages.map((s) => [s.id, s]) ?? []);
+
+  const stages: SerializedStage[] = ai.stages.map((s) => {
+    const prev = baseStageById.get(s.id);
+    return {
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      depends_on: [...s.depends_on],
+      inputs: [...s.inputs],
+      output: s.output,
+      operation: s.operation,
+      ...(prev?.color ? { color: prev.color } : {}),
+      ...(prev?.displayType ? { displayType: prev.displayType } : {}),
+    };
+  });
+
+  // Layout is host-side: only carry over the entries for stages the model
+  // kept. Missing positions get auto-laid-out by deserializePipeline.
+  const stageIds = new Set(stages.map((s) => s.id));
+  const layout: PipelineLayout = base
+    ? {
+        nodes: base.layout.nodes.filter((n) => stageIds.has(n.id)),
+        edges: base.layout.edges.filter(
+          (e) => stageIds.has(e.source) && stageIds.has(e.target),
+        ),
+      }
+    : { nodes: [], edges: [] };
+
+  return {
+    version: "1.0",
+    pipeline: {
+      name: base?.pipeline.name ?? "pipeline",
+      createdAt: base?.pipeline.createdAt ?? new Date().toISOString(),
+      ...(base?.pipeline.description
+        ? { description: base.pipeline.description }
+        : {}),
+    },
+    datasets: ai.datasets,
+    stages,
+    layout,
+  };
+}
+
+/**
+ * Lightweight check on a parsed AI / backend response. Returns null when
+ * valid, otherwise a short error message.
+ */
+export function validateAIPipelineSchema(value: unknown): string | null {
+  if (!value || typeof value !== "object") return "Expected an object";
+  const v = value as Record<string, unknown>;
+  if (!v.datasets || typeof v.datasets !== "object")
+    return "Missing or invalid `datasets`";
+  if (!Array.isArray(v.stages)) return "Missing or invalid `stages` array";
+  return null;
+}
+
 /**
  * Lightweight runtime check that a parsed object looks like a PipelineSchema.
  * Returns null when valid, or a short error message otherwise. Useful for
@@ -291,6 +426,35 @@ export function inferOutputSchemas(schema: PipelineSchema): InferredSchemaMap {
   return result;
 }
 
+/**
+ * Look up the columns of a table by name. Resolves in this priority:
+ *   1. The output of a stage whose `output` matches the name (most recent wins).
+ *   2. A raw dataset entry.
+ *   3. Empty array.
+ *
+ * Useful for column-aware editor dropdowns. Build once per schema change.
+ */
+export type UpstreamColumnsLookup = (tableName: string) => InferredColumn[];
+
+export function buildColumnsLookup(schema: PipelineSchema): UpstreamColumnsLookup {
+  const inferred = inferOutputSchemas(schema);
+  const byTable = new Map<string, InferredColumn[]>();
+  // Stage outputs: later stages with the same name overwrite (matches the
+  // resolution rule inside inferOutputSchemas).
+  for (const s of inferred.values()) byTable.set(s.output, s.columns);
+  // Datasets are a fallback (LOAD stages already register their dataset
+  // names via their stage output).
+  for (const [name, ds] of Object.entries(schema.datasets)) {
+    if (!byTable.has(name)) {
+      byTable.set(
+        name,
+        ds.columns.map((c) => ({ ...c, source: `${name}.${c.name}` })),
+      );
+    }
+  }
+  return (tableName: string) => byTable.get(tableName) ?? [];
+}
+
 function computeStageOutput(
   stage: SerializedStage,
   schema: PipelineSchema,
@@ -312,7 +476,12 @@ function computeStageOutput(
       };
     }
     case "FILTER":
-    case "SORT": {
+    case "SORT":
+    case "DEDUPE":
+    case "VALIDATE": {
+      // VALIDATE has two outputs (pass + fail) with identical column schemas.
+      // The map keys by stage.id and reports the pass schema (= input columns);
+      // the fail side has the same shape and can be looked up by failOutput.
       const cols = lookupColumnsByTableName(op.table, schema, prior);
       return {
         stageId: stage.id,
@@ -383,6 +552,89 @@ function computeStageOutput(
         inferred: true,
       };
     }
+    case "PIVOT": {
+      // The new columns come from runtime-distinct values of columnsColumn,
+      // which the UI can't see — schema is undetermined.
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: [],
+        inferred: true,
+        unknown: true,
+      };
+    }
+    case "UNPIVOT": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      const idCols = op.idColumns.map<InferredColumn>(
+        (name) =>
+          cols.find((c) => c.name === name) ?? { name, type: "unknown" },
+      );
+      const meltedSourceType = guessMeltedType(op.valueColumns, cols);
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: [
+          ...idCols,
+          { name: op.nameColumn || "variable", type: "string" },
+          { name: op.valueColumn || "value", type: meltedSourceType },
+        ],
+        inferred: true,
+      };
+    }
+    case "LOOKUP": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      if (op.outputType === "NEW_COLUMN") {
+        const name = op.newColumnName || `${op.targetColumn || "lookup"}_mapped`;
+        const exists = cols.some((c) => c.name === name);
+        return {
+          stageId: stage.id,
+          output: stage.output,
+          columns: exists
+            ? cols
+            : [...cols, { name, type: "string" }],
+          inferred: true,
+        };
+      }
+      // OVERWRITE: column shape unchanged.
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: cols,
+        inferred: true,
+      };
+    }
+    case "FORMULA": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      const existingByName = new Map(cols.map((c) => [c.name, c]));
+      for (const expr of op.expressions) {
+        if (!expr.outputColumn) continue;
+        existingByName.set(expr.outputColumn, {
+          name: expr.outputColumn,
+          type: guessFormulaType(expr.category),
+        });
+      }
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: Array.from(existingByName.values()),
+        inferred: true,
+      };
+    }
+    case "WINDOW": {
+      const cols = lookupColumnsByTableName(op.table, schema, prior);
+      const extras = op.operations
+        .filter((o) => o.outputName)
+        .map<InferredColumn>((o) => ({
+          name: o.outputName,
+          type: windowOpOutputType(o.fn),
+        }));
+      return {
+        stageId: stage.id,
+        output: stage.output,
+        columns: [...cols, ...extras],
+        inferred: true,
+      };
+    }
     case "CUSTOM":
       return {
         stageId: stage.id,
@@ -392,6 +644,22 @@ function computeStageOutput(
         unknown: true,
       };
   }
+}
+
+function guessMeltedType(
+  valueColumns: string[],
+  cols: InferredColumn[],
+): ColumnType {
+  const types = new Set<ColumnType>();
+  for (const name of valueColumns) {
+    const found = cols.find((c) => c.name === name);
+    if (found) types.add(found.type);
+  }
+  if (types.size === 1) {
+    const [only] = types;
+    return only ?? "unknown";
+  }
+  return "unknown";
 }
 
 function lookupColumnsByTableName(
@@ -426,6 +694,37 @@ function aggregateOutputType(fn: string): ColumnType {
     case "MIN":
     case "MAX":
       return "float";
+    default:
+      return "unknown";
+  }
+}
+
+function guessFormulaType(category: string): ColumnType {
+  switch (category) {
+    case "MATH":
+      return "float";
+    case "STRING":
+      return "string";
+    case "DATE":
+      return "timestamp";
+    default:
+      return "unknown";
+  }
+}
+
+function windowOpOutputType(fn: string): ColumnType {
+  switch (fn) {
+    case "RANK":
+    case "DENSE_RANK":
+    case "ROW_NUMBER":
+      return "integer";
+    case "SUM":
+    case "AVG":
+      return "float";
+    case "LEAD":
+    case "LAG":
+      // Returns the same type as the source column; we don't know it here.
+      return "unknown";
     default:
       return "unknown";
   }

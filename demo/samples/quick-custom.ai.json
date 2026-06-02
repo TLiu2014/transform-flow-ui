@@ -1,0 +1,49 @@
+{
+  "datasets": {
+    "events": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp"
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "id": "l1",
+      "name": "load_events",
+      "type": "LOAD",
+      "depends_on": [],
+      "inputs": [],
+      "output": "events",
+      "operation": {
+        "stageType": "LOAD",
+        "tableName": "events",
+        "source": "events.csv"
+      }
+    },
+    {
+      "id": "s1",
+      "name": "recent_events",
+      "type": "CUSTOM",
+      "depends_on": [
+        "l1"
+      ],
+      "inputs": [],
+      "output": "recent_events",
+      "operation": {
+        "stageType": "CUSTOM",
+        "sql": "SELECT * FROM events WHERE created_at >= NOW() - INTERVAL '7 days'"
+      }
+    }
+  ]
+}
