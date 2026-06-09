@@ -15,6 +15,7 @@ export {
   VALIDATE_FAIL_HANDLE_ID,
 } from "./components/flow/StageEdgeHandles";
 export { StageConfigUI } from "./components/config/StageConfigUI";
+export { StageDetailsView } from "./components/config/StageDetailsView";
 export { SaveFlowButton } from "./components/toolbar/SaveFlowButton";
 export { AddStageMenu } from "./components/toolbar/AddStageMenu";
 export { DataSchemaView } from "./components/views/DataSchemaView";

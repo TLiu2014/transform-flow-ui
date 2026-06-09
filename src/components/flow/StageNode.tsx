@@ -10,6 +10,7 @@ import {
   FunctionSquare,
   Code2,
   ExternalLink,
+  Eye,
   Info,
   Pencil,
   Table2,
@@ -59,6 +60,7 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
   const {
     onShowOutput,
     onEdit,
+    onShowDetails,
     readOnly,
     validReconnectNodeIdRef,
     selfLoopReconnectNodeIdRef,
@@ -292,6 +294,21 @@ function StageNodeImpl({ id, data, selected }: NodeProps<StageNodeType>) {
                   className="inline-flex h-5 w-5 items-center justify-center rounded text-gray-500 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                 >
                   <Pencil className="h-3 w-3" />
+                </button>
+              )}
+              {onShowDetails && readOnly && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowDetails(id);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="View stage details (or double-click the node)"
+                  aria-label="View stage details"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded text-gray-500 dark:text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                  <Eye className="h-3 w-3" />
                 </button>
               )}
             </div>

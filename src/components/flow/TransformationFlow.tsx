@@ -44,7 +44,9 @@ import {
 } from "./StageEdgeHandles";
 import { GradientEdge } from "./GradientEdge";
 import { NodeToolbarPositionProvider } from "./NodeToolbarPositionContext";
+import { PopoverStageDetails } from "./PopoverStageDetails";
 import { PopoverStageEditor } from "./PopoverStageEditor";
+import { StageDetailsView } from "@/components/config/StageDetailsView";
 import { StageNode } from "./StageNode";
 import {
   StageNodeContext,
@@ -463,12 +465,17 @@ export const TransformationFlow = forwardRef<
 
   const handleNodeClick = (node: Node<StageNodeData>) => {
     setSelectedNodeId(node.id);
-    if (!isReadOnly && configDisplayMode === "panel") setEditingNodeId(node.id);
+    // In panel mode, a single click focuses the node in the side panel
+    // (editor when editing, details when view-only). Popover mode requires
+    // an explicit double-click or icon button.
+    if (configDisplayMode === "panel") setEditingNodeId(node.id);
   };
 
   const handleNodeDoubleClick = (node: Node<StageNodeData>) => {
     setSelectedNodeId(node.id);
-    if (!isReadOnly) setEditingNodeId(node.id);
+    // Double-click works in both edit and view-only modes — the overlay it
+    // opens just renders differently per mode.
+    setEditingNodeId(node.id);
   };
 
   const handlePaneClick = () => {
@@ -477,6 +484,14 @@ export const TransformationFlow = forwardRef<
   };
 
   const handleEditNode = (stageId: string) => {
+    setSelectedNodeId(stageId);
+    setEditingNodeId(stageId);
+  };
+
+  // Same target as handleEditNode — symmetric entry point from the node's
+  // eye icon in view-only mode. Kept as a distinct name so future divergence
+  // (e.g. analytics) doesn't bleed into edit-mode handling.
+  const handleShowDetailsNode = (stageId: string) => {
     setSelectedNodeId(stageId);
     setEditingNodeId(stageId);
   };
@@ -572,6 +587,7 @@ export const TransformationFlow = forwardRef<
     () => ({
       onShowOutput,
       onEdit: isReadOnly ? undefined : handleEditNode,
+      onShowDetails: isReadOnly ? handleShowDetailsNode : undefined,
       readOnly: isReadOnly,
       validReconnectNodeIdRef,
       selfLoopReconnectNodeIdRef,
@@ -664,33 +680,51 @@ export const TransformationFlow = forwardRef<
                 }}
                 className="!bg-white dark:bg-gray-900"
               />
-              {!isReadOnly && configDisplayMode === "popover" && editingNode && (
-                <PopoverStageEditor
+              {configDisplayMode === "popover" && editingNode && (
+                isReadOnly ? (
+                  <PopoverStageDetails
+                    node={editingNode}
+                    onClose={() => setEditingNodeId(null)}
+                  />
+                ) : (
+                  <PopoverStageEditor
+                    node={editingNode}
+                    onUpdate={handleUpdateNode}
+                    onDelete={handleDelete}
+                    onCancel={() => setEditingNodeId(null)}
+                    confirmBeforeDelete={confirmBeforeDelete}
+                    columnsLookup={columnsLookup}
+                  />
+                )
+              )}
+            </ReactFlow>
+          </div>
+
+          {configDisplayMode === "panel" && (
+            isReadOnly ? (
+              editingNode && (
+                <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                  <StageDetailsView
+                    node={editingNode}
+                    onClose={() => setEditingNodeId(null)}
+                  />
+                </div>
+              )
+            ) : (
+              <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <StageConfigUI
                   node={editingNode}
-                  onUpdate={handleUpdateNode}
+                  onUpdate={(id, patch) => {
+                    handleUpdateNode(id, patch);
+                    setEditingNodeId(null);
+                  }}
                   onDelete={handleDelete}
                   onCancel={() => setEditingNodeId(null)}
                   confirmBeforeDelete={confirmBeforeDelete}
                   columnsLookup={columnsLookup}
                 />
-              )}
-            </ReactFlow>
-          </div>
-
-          {!isReadOnly && configDisplayMode === "panel" && (
-            <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-              <StageConfigUI
-                node={editingNode}
-                onUpdate={(id, patch) => {
-                  handleUpdateNode(id, patch);
-                  setEditingNodeId(null);
-                }}
-                onDelete={handleDelete}
-                onCancel={() => setEditingNodeId(null)}
-                confirmBeforeDelete={confirmBeforeDelete}
-                columnsLookup={columnsLookup}
-              />
-            </div>
+              </div>
+            )
           )}
         </div>
       </NodeToolbarPositionProvider>
